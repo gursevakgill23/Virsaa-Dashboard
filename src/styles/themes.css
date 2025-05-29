@@ -1,0 +1,41 @@
+:root {
+  --primary-bg: #f8f1e9; /* Soft cream background */
+  --secondary-bg: #ffffff; /* White card background */
+  --text-primary: #2c222b; /* Dark brown text */
+  --text-secondary: #5c4d5a; /* Muted purple-gray text */
+  --text-on-accent: #ffffff; /* White text on accent */
+  --text-on-button: #ffffff; /* White text on buttons */
+  --accent: #8b5e3c; /* Rich brown */
+  --accent-hover: #a6744f; /* Lighter brown on hover */
+  --button-bg: #6b4e71; /* Deep purple for buttons */
+  --button-hover: #7f5a83; /* Lighter purple on hover */
+  --gradient-start: #8b5e3c; /* Brown gradient start */
+  --gradient-end: #6b4e71; /* Purple gradient end */
+  --border: #d9d2cb; /* Light cream border */
+  --shadow: rgba(0, 0, 0, 0.15);
+  --card-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="dark"] {
+  --primary-bg: #2c222b; /* Dark brown-gray background */
+  --secondary-bg: #3a3238; /* Darker purple-gray card background */
+  --text-primary: #e6e1e5; /* Light cream text */
+  --text-secondary: #a89ca5; /* Light purple-gray text */
+  --text-on-accent: #ffffff; /* White text on accent */
+  --text-on-button: #ffffff; /* White text on buttons */
+  --accent: #a6744f; /* Muted brown for dark mode */
+  --accent-hover: #8b5e3c; /* Rich brown */
+  --button-bg: #7f5a83; /* Slightly lighter purple for buttons */
+  --button-hover: #9b6a9f; /* Even lighter purple on hover */
+  --gradient-start: #6b4e71; /* Purple gradient start */
+  --gradient-end: #a6744f; /* Brown gradient end */
+  --border: #5c4d5a; /* Dark purple-gray border */
+  --shadow: rgba(255, 255, 255, 0.15);
+  --card-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+body {
+  background: var(--primary-bg);
+  color: var(--text-primary);
+  transition: all 0.3s ease;
+}

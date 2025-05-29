@@ -1,0 +1,316 @@
+.page {
+  padding: 80px 30px 30px;
+  background: var(--primary-bg);
+  min-height: 100vh;
+  color: var(--text-primary);
+}
+
+.page h1 {
+  font-size: 2rem;
+  color: var(--accent);
+  margin-bottom: 20px;
+}
+
+.page h2 {
+  font-size: 1.5rem;
+  color: var(--text-primary);
+  margin: 30px 0 15px;
+}
+
+.cardContainer {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  margin-bottom: 40px;
+}
+
+.card {
+  background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+  color: var(--text-on-accent);
+  padding: 20px;
+  border-radius: 10px;
+  text-align: center;
+  box-shadow: var(--card-shadow);
+  transform: scale(1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 20px var(--shadow);
+}
+
+.card h3 {
+  font-size: 1.2rem;
+  margin-bottom: 10px;
+}
+
+.card p {
+  font-size: 1.8rem;
+  font-weight: bold;
+}
+
+.chartContainer {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+  margin-bottom: 40px;
+}
+
+.chart {
+  background: var(--secondary-bg);
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: var(--card-shadow);
+  opacity: 0;
+  transform: translateY(20px);
+  animation: fadeInUp 0.5s ease forwards;
+}
+
+.chart h3 {
+  font-size: 1.2rem;
+  color: var(--text-primary);
+  margin-bottom: 15px;
+  text-align: center;
+}
+
+.chartWrapper {
+  height: 200px;
+}
+
+.tabSection {
+  margin-bottom: 40px;
+}
+
+.tabContainer {
+  background: var(--secondary-bg);
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: var(--card-shadow);
+}
+
+.tabButtons {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.tabButton {
+  background: var(--button-bg);
+  color: var(--text-on-button);
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.tabButton:hover {
+  background: var(--button-hover);
+  transform: translateY(-2px);
+}
+
+.tabButton.active {
+  background: var(--accent);
+  color: var(--text-on-accent);
+  font-weight: bold;
+}
+
+.tabDropdown {
+  display: none;
+  width: 100%;
+  padding: 10px;
+  background: var(--primary-bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text-primary);
+  margin-bottom: 20px;
+}
+
+.tabContent {
+  opacity: 0;
+  transform: translateY(20px);
+  animation: fadeInUp 0.5s ease forwards;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.table th {
+  background: var(--gradient-start);
+  color: var(--text-on-accent);
+}
+
+.tableRow {
+  transition: background 0.2s ease;
+}
+
+.tableRow:hover {
+  background: var(--accent-hover);
+  color: var(--text-on-accent);
+}
+
+.deleteButton {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 1.2rem;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.deleteButton:hover {
+  color: var(--accent);
+  transform: scale(1.2);
+}
+
+/* Upload Form Styles */
+.uploadForm {
+  display: grid;
+  gap: 20px;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.formGroup label {
+  font-size: 1rem;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.input {
+  padding: 10px;
+  border: 2px solid var(--accent);
+  border-radius: 5px;
+  background: var(--primary-bg);
+  color: var(--text-primary);
+  font-size: 1rem;
+  transition: border-color 0.2s ease;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--button-bg);
+}
+
+.input[type="file"] {
+  padding: 5px;
+}
+
+.jsonSection {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.jsonInput {
+  padding: 10px;
+  border: 2px solid var(--accent);
+  border-radius: 5px;
+  background: var(--primary-bg);
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-family: monospace;
+  resize: vertical;
+  transition: border-color 0.2s ease;
+}
+
+.jsonInput:focus {
+  outline: none;
+  border-color: var(--button-bg);
+}
+
+.submitButton {
+  background: var(--button-bg);
+  color: var(--text-on-button);
+  border: none;
+  padding: 12px 20px;
+  border-radius: 5px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.submitButton:hover {
+  background: var(--button-hover);
+  transform: scale(1.05);
+}
+
+.submitButton:disabled {
+  background: var(--border);
+  cursor: not-allowed;
+}
+
+.error {
+  color: #e74c3c;
+  font-size: 0.9rem;
+}
+
+.success {
+  color: #2ecc71;
+  font-size: 1rem;
+  text-align: center;
+}
+
+@keyframes fadeInUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 768px) {
+  .page {
+    margin-left: 0;
+    padding: 70px 20px 20px;
+  }
+
+  .page h1 {
+    font-size: 1.5rem;
+  }
+
+  .cardContainer {
+    grid-template-columns: 1fr;
+  }
+
+  .chartContainer {
+    grid-template-columns: 1fr;
+  }
+
+  .chartWrapper {
+    height: 250px;
+  }
+
+  .tabButtons {
+    display: none;
+  }
+
+  .tabDropdown {
+    display: block;
+  }
+
+  .uploadForm,
+  .jsonSection {
+    max-width: 100%;
+  }
+}

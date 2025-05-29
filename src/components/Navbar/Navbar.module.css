@@ -1,0 +1,160 @@
+.navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--secondary-bg);
+  padding: 15px 30px;
+  box-shadow: 0 2px 10px var(--shadow);
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+}
+
+.hamburger {
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-size: 1.5rem;
+  cursor: pointer;
+  display: none;
+  padding: 8px;
+}
+
+.searchBar {
+  display: flex;
+  align-items: center;
+  background: var(--primary-bg);
+  border: 2px solid var(--accent);
+  border-radius: 25px;
+  padding: 8px 15px;
+  width: 40%;
+  max-width: 500px;
+  min-width: 200px;
+  margin: 0 auto;
+}
+
+.searchIcon {
+  color: var(--text-secondary);
+  margin-right: 10px;
+}
+
+.searchInput {
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  width: 100%;
+}
+
+.rightSection {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.themeToggle {
+  background: var(--button-bg);
+  border: none;
+  color: var(--text-on-button);
+  font-size: 1em;
+  cursor: pointer;
+  padding: 5px 6px;
+  border-radius: 50%;
+  transition: background 0.2s ease;
+}
+
+.themeToggle:hover {
+  background: var(--button-hover);
+}
+
+.profile {
+  position: relative;
+}
+
+.profileButton {
+  display: flex;
+  align-items: center;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  gap: 8px;
+}
+
+.profileIcon {
+  font-size: 1.5rem;
+}
+
+.profileDropdown {
+  position: absolute;
+  top: 40px;
+  right: 0;
+  background: var(--secondary-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 2px 10px var(--shadow);
+  width: 150px;
+}
+
+.dropdownItem {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 10px 15px;
+  background: var(--button-bg);
+  border: none;
+  color: var(--text-on-button);
+  text-align: left;
+  cursor: pointer;
+  gap: 8px;
+  transition: background 0.2s ease;
+}
+
+.dropdownItem:hover {
+  background: var(--button-hover);
+}
+
+.dropdownIcon {
+  font-size: 1.1rem;
+}
+
+@media (max-width: 1024px) {
+  .searchBar {
+    width: 70%;
+    max-width: 300px;
+  }
+}
+@media (max-width: 992px) {
+  .searchBar {
+    width: 40%;
+    max-width: 300px;
+    margin-right: 30px;
+  }
+}
+
+@media (max-width: 768px) {
+  .navbar {
+    padding: 10px 20px;
+  }
+
+  .hamburger {
+    display: block;
+  }
+
+  .searchBar {
+    width: 50%;
+    max-width: 250px;
+    min-width: 150px;
+    margin: 0 auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .searchBar {
+    width: 90%;
+    max-width: 200px;
+    min-width: 120px;
+  }
+}
