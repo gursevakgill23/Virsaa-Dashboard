@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { FaFileUpload, FaCode } from 'react-icons/fa';
 import axios from 'axios';
+import { toast } from 'react-toastify';
 import styles from '../Page.module.css';
+
+const API_STRING = "http://virsaa-prod.eba-7cc3yk92.us-east-1.elasticbeanstalk.com";
 
 const EbookUpload = () => {
   const [activeTab, setActiveTab] = useState('form-data');
@@ -20,19 +23,45 @@ const EbookUpload = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  // Check if user is authenticated
+  const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+  const accessToken = localStorage.getItem('access_token');
+
   // Fetch authors for dropdown
   useEffect(() => {
+    if (!isAuthenticated || !accessToken) {
+      setErrors({ auth: 'You must be logged in to access this page.' });
+      toast.error('You must be logged in to access this page.', {
+        position: 'top-right',
+        autoClose: 5000,
+      });
+      return;
+    }
+
     const fetchAuthors = async () => {
       try {
-        const response = await axios.get('http://localhost:8000/collections/authors/');
-        setAuthors(response.data);
+        const response = await axios.get(`${API_STRING}/collections/authors/`, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+        // Ensure response.data is an array
+        if (Array.isArray(response.data)) {
+          setAuthors(response.data);
+        } else {
+          throw new Error('Invalid authors data format');
+        }
       } catch (error) {
-        console.error('Error fetching authors:', error);
+        console.error('Error fetching authors:', error.response?.data || error.message);
         setErrors({ error: 'Failed to load authors. Please try again.' });
+        toast.error('Failed to load authors. Please try again.', {
+          position: 'top-right',
+          autoClose: 5000,
+        });
       }
     };
     fetchAuthors();
-  }, []);
+  }, [isAuthenticated, accessToken, setAuthors]);
 
   // Handle form input changes
   const handleInputChange = (e) => {
@@ -48,6 +77,7 @@ const EbookUpload = () => {
   // Validate form data
   const validateForm = () => {
     const newErrors = {};
+    if (!isAuthenticated) newErrors.auth = 'You must be logged in to upload ebooks.';
     if (!formData.title.trim()) newErrors.title = 'Title is required';
     if (!formData.author) newErrors.author = 'Author is required';
     if (!formData.pages || isNaN(formData.pages) || Number(formData.pages) <= 0)
@@ -63,6 +93,7 @@ const EbookUpload = () => {
   const validateJson = () => {
     try {
       const parsed = JSON.parse(jsonData);
+      if (!isAuthenticated) return { json: 'You must be logged in to upload ebooks.' };
       if (!parsed.title) return { json: 'Title is required' };
       if (!parsed.author) return { json: 'Author ID is required' };
       if (!parsed.pages || isNaN(Number(parsed.pages)) || Number(parsed.pages) <= 0)
@@ -82,6 +113,12 @@ const EbookUpload = () => {
     const validationErrors = validateForm();
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
+      Object.values(validationErrors).forEach(error => {
+        toast.error(error, {
+          position: 'top-right',
+          autoClose: 5000,
+        });
+      });
       return;
     }
 
@@ -95,16 +132,20 @@ const EbookUpload = () => {
     try {
       setIsLoading(true);
       await axios.post(
-        'http://localhost:8000/collections/ebooks/admin_create/',
+        `${API_STRING}/collections/ebooks/admin_create/`,
         data,
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem('access_token')}`,
+            Authorization: `Bearer ${accessToken}`,
             'Content-Type': 'multipart/form-data'
           }
         }
       );
       setSuccessMessage('Ebook uploaded successfully!');
+      toast.success('Ebook uploaded successfully!', {
+        position: 'top-right',
+        autoClose: 5000,
+      });
       setFormData({
         title: '',
         author: '',
@@ -123,7 +164,20 @@ const EbookUpload = () => {
       }
     } catch (error) {
       console.error('Error uploading ebook:', error.response?.data);
-      setErrors(error.response?.data || { error: 'Failed to upload ebook. Please try again.' });
+      if (error.response?.status === 401) {
+        setErrors({ error: 'Unauthorized. Please log in again.' });
+        toast.error('Unauthorized. Please log in again.', {
+          position: 'top-right',
+          autoClose: 5000,
+        });
+      } else {
+        const errorMessage = error.response?.data?.error || 'Failed to upload ebook. Please try again.';
+        setErrors({ error: errorMessage });
+        toast.error(errorMessage, {
+          position: 'top-right',
+          autoClose: 5000,
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -136,26 +190,49 @@ const EbookUpload = () => {
     const validationErrors = validateJson();
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
+      Object.values(validationErrors).forEach(error => {
+        toast.error(error, {
+          position: 'top-right',
+          autoClose: 5000,
+        });
+      });
       return;
     }
 
     try {
       setIsLoading(true);
       await axios.post(
-        'http://localhost:8000/collections/ebooks/admin_create/',
+        `${API_STRING}/collections/ebooks/admin_create/`,
         JSON.parse(jsonData),
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem('access_token')}`,
+            Authorization: `Bearer ${accessToken}`,
             'Content-Type': 'application/json'
           }
         }
       );
       setSuccessMessage('Ebook uploaded successfully via JSON!');
+      toast.success('Ebook uploaded successfully via JSON!', {
+        position: 'top-right',
+        autoClose: 5000,
+      });
       setJsonData('');
     } catch (error) {
       console.error('Error uploading JSON:', error.response?.data);
-      setErrors(error.response?.data || { json: 'Failed to upload JSON. Please check the format and try again.' });
+      if (error.response?.status === 401) {
+        setErrors({ error: 'Unauthorized. Please log in again.' });
+        toast.error('Unauthorized. Please log in again.', {
+          position: 'top-right',
+          autoClose: 5000,
+        });
+      } else {
+        const errorMessage = error.response?.data?.error || 'Failed to upload JSON. Please check the format and try again.';
+        setErrors({ json: errorMessage });
+        toast.error(errorMessage, {
+          position: 'top-right',
+          autoClose: 5000,
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -164,18 +241,23 @@ const EbookUpload = () => {
   return (
     <div className={styles.page}>
       <h1>Upload Ebook</h1>
+      {errors.auth && (
+        <span className={styles.error}>{errors.auth}</span>
+      )}
       <div className={styles.tabSection}>
         <div className={styles.tabContainer}>
           <div className={styles.tabButtons}>
             <button
               className={`${styles.tabButton} ${activeTab === 'form-data' ? styles.active : ''}`}
               onClick={() => setActiveTab('form-data')}
+              disabled={!isAuthenticated}
             >
               <FaFileUpload /> Form Data
             </button>
             <button
               className={`${styles.tabButton} ${activeTab === 'json-data' ? styles.active : ''}`}
               onClick={() => setActiveTab('json-data')}
+              disabled={!isAuthenticated}
             >
               <FaCode /> JSON Data
             </button>
@@ -184,6 +266,7 @@ const EbookUpload = () => {
             className={styles.tabDropdown}
             value={activeTab}
             onChange={(e) => setActiveTab(e.target.value)}
+            disabled={!isAuthenticated}
           >
             <option value="form-data">Form Data</option>
             <option value="json-data">JSON Data</option>
@@ -200,6 +283,7 @@ const EbookUpload = () => {
                     onChange={handleInputChange}
                     className={styles.input}
                     required
+                    disabled={!isAuthenticated}
                   />
                   {errors.title && <span className={styles.error}>{errors.title}</span>}
                 </div>
@@ -210,6 +294,7 @@ const EbookUpload = () => {
                     value={formData.author}
                     onChange={handleInputChange}
                     className={styles.input}
+                    disabled={!isAuthenticated}
                   >
                     <option value="">Select Author</option>
                     {authors.map(author => (
@@ -230,6 +315,7 @@ const EbookUpload = () => {
                     max="5"
                     step="0.1"
                     required
+                    disabled={!isAuthenticated}
                   />
                   {errors.rating && <span className={styles.error}>{errors.rating}</span>}
                 </div>
@@ -242,6 +328,7 @@ const EbookUpload = () => {
                     onChange={handleInputChange}
                     className={styles.input}
                     accept="image/png,image/jpeg"
+                    disabled={!isAuthenticated}
                   />
                   {errors.cover_image && <span className={styles.error}>{errors.cover_image}</span>}
                 </div>
@@ -254,6 +341,7 @@ const EbookUpload = () => {
                     onChange={handleInputChange}
                     className={styles.input}
                     accept="application/pdf"
+                    disabled={!isAuthenticated}
                   />
                   {errors.pdf_file && <span className={styles.error}>{errors.pdf_file}</span>}
                 </div>
@@ -267,6 +355,7 @@ const EbookUpload = () => {
                     className={styles.input}
                     min="1"
                     required
+                    disabled={!isAuthenticated}
                   />
                   {errors.pages && <span className={styles.error}>{errors.pages}</span>}
                 </div>
@@ -278,11 +367,12 @@ const EbookUpload = () => {
                     onChange={handleInputChange}
                     className={styles.input}
                     rows="4"
+                    disabled={!isAuthenticated}
                   />
                 </div>
                 {errors.error && <span className={styles.error}>{errors.error}</span>}
                 {successMessage && <span className={styles.success}>{successMessage}</span>}
-                <button type="submit" className={styles.submitButton} disabled={isLoading}>
+                <button type="submit" className={styles.submitButton} disabled={isLoading || !isAuthenticated}>
                   {isLoading ? 'Uploading...' : 'Upload Ebook'}
                 </button>
               </form>
@@ -295,13 +385,14 @@ const EbookUpload = () => {
                   className={styles.jsonInput}
                   rows="10"
                   placeholder='{"title": "Book Title", "author": 1, "rating": 4.5, "pages": 200, "description": "Book description"}'
+                  disabled={!isAuthenticated}
                 />
                 {errors.json && <span className={styles.error}>{errors.json}</span>}
                 {successMessage && <span className={styles.success}>{successMessage}</span>}
                 <button
                   onClick={handleJsonSubmit}
                   className={styles.submitButton}
-                  disabled={isLoading}
+                  disabled={isLoading || !isAuthenticated}
                 >
                   {isLoading ? 'Uploading...' : 'Upload JSON'}
                 </button>

@@ -1,0 +1,198 @@
+/* Modern, innovative, and responsive styles for the Users page table */
+.usersPage {
+  max-width: 1200px;
+  margin: 6rem auto;
+  padding: 0; /* Inherit padding from Page.module.css */
+  color: var(--text-primary);
+  transition: all 0.3s ease;
+}
+
+/* Title */
+.usersTitle {
+  font-size: 2rem; /* Matches Page.module.css */
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 20px;
+  color: var(--accent);
+  animation: fadeIn 1s ease;
+}
+
+/* Loading spinner */
+.usersLoading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 50vh;
+}
+
+.usersSpinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--accent);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* Error message */
+.usersError {
+  text-align: center;
+  color: #e74c3c; /* Matches error color from Page.module.css */
+  font-size: 1rem;
+  margin: 2rem 0;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  animation: fadeIn 0.5s ease;
+}
+
+/* Empty state */
+.usersEmpty {
+  text-align: center;
+  font-size: 1rem;
+  color: var(--text-primary);
+  opacity: 0.7;
+  margin: 2rem 0;
+  animation: fadeIn 0.5s ease;
+}
+
+/* Table wrapper for horizontal scrolling on mobile */
+.usersTableWrapper {
+  overflow-x: auto;
+  margin-bottom: 40px;
+  animation: fadeInUp 0.5s ease;
+}
+
+/* Users table */
+.usersTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.usersTable th,
+.usersTable td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.usersTable th {
+  background: var(--gradient-start); /* Matches Page.module.css table th */
+  color: var(--text-on-accent);
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.usersTable td {
+  color: var(--text-primary);
+}
+
+.tableRow {
+  transition: background 0.2s ease;
+}
+
+.tableRow:hover {
+  background: var(--accent-hover); /* Matches Page.module.css */
+  color: var(--text-on-accent);
+}
+
+/* User avatar */
+.userAvatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--accent);
+  transition: transform 0.3s ease;
+}
+
+.tableRow:hover .userAvatar {
+  transform: scale(1.1);
+}
+
+/* User badges */
+.userBadges {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.userBadge {
+  padding: 0.3rem 0.8rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.userBadgeSuperuser {
+  background: linear-gradient(45deg, #ff6b6b, #ff8e53); /* Custom gradient for superuser */
+  color: var(--text-on-accent);
+}
+
+.userBadgeStaff {
+  background: linear-gradient(45deg, var(--gradient-start), var(--gradient-end)); /* Matches Page.module.css */
+  color: var(--text-on-accent);
+}
+
+/* Hide columns on mobile */
+.hideOnMobile {
+  display: table-cell;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .usersTable {
+    font-size: 0.85rem;
+  }
+
+  .usersTable th,
+  .usersTable td {
+    padding: 8px;
+  }
+
+  .userAvatar {
+    width: 32px;
+    height: 32px;
+  }
+
+  .hideOnMobile {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .usersTitle {
+    font-size: 1.5rem; /* Matches Page.module.css media query */
+  }
+
+  .usersTable {
+    font-size: 0.8rem;
+  }
+
+  .usersTable th,
+  .usersTable td {
+    padding: 6px;
+  }
+
+  .userAvatar {
+    width: 28px;
+    height: 28px;
+  }
+}
