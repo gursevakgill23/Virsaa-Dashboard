@@ -1,9 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FaFileUpload, FaCode } from 'react-icons/fa';
 import axios from 'axios';
+import { toast } from 'react-toastify';
+import { useAuth } from '../../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import Cookies from 'js-cookie';
 import styles from '../Page.module.css';
 
+const API_STRING = "http://virsaa-prod.eba-7cc3yk92.us-east-1.elasticbeanstalk.com";
+
 const AuthorUpload = () => {
+  const { accessToken, setAccessToken } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('form-data');
   const [formData, setFormData] = useState({
     name: '',
@@ -21,6 +29,20 @@ const AuthorUpload = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  const isAuthenticated = Cookies.get('isAuthenticated') === 'true';
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!isAuthenticated || !accessToken) {
+      setErrors({ auth: 'You must be logged in to access this page.' });
+      toast.error('You must be logged in to access this page.', {
+        position: 'top-right',
+        autoClose: 5000,
+      });
+      navigate('/login', { replace: true });
+    }
+  }, [isAuthenticated, accessToken, navigate]);
+
   // Handle form input changes
   const handleInputChange = (e) => {
     const { name, value, files } = e.target;
@@ -28,13 +50,13 @@ const AuthorUpload = () => {
       ...prev,
       [name]: files ? files[0] : value
     }));
-    // Clear field-specific error
     setErrors(prevErrors => ({ ...prevErrors, [name]: '' }));
   };
 
   // Validate form data
   const validateForm = () => {
     const newErrors = {};
+    if (!isAuthenticated) newErrors.auth = 'You must be logged in to upload authors.';
     if (!formData.name.trim()) newErrors.name = 'Name is required';
     if (formData.rating < 0 || formData.rating > 5)
       newErrors.rating = 'Rating must be between 0 and 5';
@@ -43,14 +65,17 @@ const AuthorUpload = () => {
 
   // Validate JSON data
   const validateJson = () => {
+    const newErrors = {};
     try {
       const parsed = JSON.parse(jsonData);
-      if (!parsed.name) return { json: 'Name is required' };
+      if (!isAuthenticated) newErrors.json = 'You must be logged in to upload authors.';
+      if (!parsed.name) newErrors.json = 'Name is required';
       if (parsed.rating < 0 || parsed.rating > 5)
-        return { json: 'Rating must be between 0 and 5' };
-      return {};
+        newErrors.json = 'Rating must be between 0 and 5';
+      return newErrors;
     } catch (error) {
-      return { json: 'Invalid JSON format' };
+      newErrors.json = 'Invalid JSON format';
+      return newErrors;
     }
   };
 
@@ -61,6 +86,12 @@ const AuthorUpload = () => {
     const validationErrors = validateForm();
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
+      Object.values(validationErrors).forEach(error => {
+        toast.error(error, {
+          position: 'top-right',
+          autoClose: 5000,
+        });
+      });
       return;
     }
 
@@ -73,17 +104,48 @@ const AuthorUpload = () => {
 
     try {
       setIsLoading(true);
-      await axios.post(
-        'http://localhost:8000/collections/authors/admin_create/',
+      let response = await axios.post(
+        `${API_STRING}/collections/authors/admin_create/`,
         data,
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem('access_token')}`,
+            Authorization: `Bearer ${accessToken}`,
             'Content-Type': 'multipart/form-data'
           }
         }
       );
+
+      if (response.status === 401) {
+        const refreshToken = Cookies.get('refreshToken');
+        if (!refreshToken) {
+          throw new Error('No refresh token available');
+        }
+        const refreshResponse = await axios.post(
+          `${API_STRING}/api/auth/token/refresh/`,
+          { refresh: refreshToken },
+          { headers: { 'Content-Type': 'application/json' } }
+        );
+        const newAccessToken = refreshResponse.data.access;
+        Cookies.set('accessToken', newAccessToken, { expires: 1, secure: true, sameSite: 'Strict' });
+        setAccessToken(newAccessToken);
+
+        response = await axios.post(
+          `${API_STRING}/collections/authors/admin_create/`,
+          data,
+          {
+            headers: {
+              Authorization: `Bearer ${newAccessToken}`,
+              'Content-Type': 'multipart/form-data'
+            }
+          }
+        );
+      }
+
       setSuccessMessage('Author uploaded successfully!');
+      toast.success('Author uploaded successfully!', {
+        position: 'top-right',
+        autoClose: 5000,
+      });
       setFormData({
         name: '',
         image: null,
@@ -95,15 +157,24 @@ const AuthorUpload = () => {
         biography: '',
         awards: ''
       });
-      // Reset file input
-      try {
-        document.getElementById('image').value = '';
-      } catch (err) {
-        console.warn('Failed to reset file input:', err);
-      }
+      document.getElementById('image').value = '';
     } catch (error) {
       console.error('Error uploading author:', error.response?.data);
-      setErrors(error.response?.data || { error: 'Failed to upload author. Please try again.' });
+      if (error.response?.status === 401) {
+        setErrors({ error: 'Unauthorized. Please log in again.' });
+        toast.error('Unauthorized. Please log in again.', {
+          position: 'top-right',
+          autoClose: 5000,
+        });
+        navigate('/login', { replace: true });
+      } else {
+        const errorMessage = error.response?.data?.error || 'Failed to upload author. Please try again.';
+        setErrors({ error: errorMessage });
+        toast.error(errorMessage, {
+          position: 'top-right',
+          autoClose: 5000,
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -116,26 +187,77 @@ const AuthorUpload = () => {
     const validationErrors = validateJson();
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
+      Object.values(validationErrors).forEach(error => {
+        toast.error(error, {
+          position: 'top-right',
+          autoClose: 5000,
+        });
+      });
       return;
     }
 
     try {
       setIsLoading(true);
-      await axios.post(
-        'http://localhost:8000/collections/authors/admin_create/',
+      let response = await axios.post(
+        `${API_STRING}/collections/authors/admin_create/`,
         JSON.parse(jsonData),
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem('access_token')}`,
+            Authorization: `Bearer ${accessToken}`,
             'Content-Type': 'application/json'
           }
         }
       );
+
+      if (response.status === 401) {
+        const refreshToken = Cookies.get('refreshToken');
+        if (!refreshToken) {
+          throw new Error('No refresh token available');
+        }
+        const refreshResponse = await axios.post(
+          `${API_STRING}/api/auth/token/refresh/`,
+          { refresh: refreshToken },
+          { headers: { 'Content-Type': 'application/json' } }
+        );
+        const newAccessToken = refreshResponse.data.access;
+        Cookies.set('accessToken', newAccessToken, { expires: 1, secure: true, sameSite: 'Strict' });
+        setAccessToken(newAccessToken);
+
+        response = await axios.post(
+          `${API_STRING}/collections/authors/admin_create/`,
+          JSON.parse(jsonData),
+          {
+            headers: {
+              Authorization: `Bearer ${newAccessToken}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+      }
+
       setSuccessMessage('Author uploaded successfully via JSON!');
+      toast.success('Author uploaded successfully via JSON!', {
+        position: 'top-right',
+        autoClose: 5000,
+      });
       setJsonData('');
     } catch (error) {
       console.error('Error uploading JSON:', error.response?.data);
-      setErrors(error.response?.data || { json: 'Failed to upload JSON. Please check the format and try again.' });
+      if (error.response?.status === 401) {
+        setErrors({ error: 'Unauthorized. Please log in again.' });
+        toast.error('Unauthorized. Please log in again.', {
+          position: 'top-right',
+          autoClose: 5000,
+        });
+        navigate('/login', { replace: true });
+      } else {
+        const errorMessage = error.response?.data?.error || 'Failed to upload JSON. Please check the format and try again.';
+        setErrors({ json: errorMessage });
+        toast.error(errorMessage, {
+          position: 'top-right',
+          autoClose: 5000,
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -144,18 +266,23 @@ const AuthorUpload = () => {
   return (
     <div className={styles.page}>
       <h1>Upload Author</h1>
+      {errors.auth && (
+        <span className={styles.error}>{errors.auth}</span>
+      )}
       <div className={styles.tabSection}>
         <div className={styles.tabContainer}>
           <div className={styles.tabButtons}>
             <button
               className={`${styles.tabButton} ${activeTab === 'form-data' ? styles.active : ''}`}
               onClick={() => setActiveTab('form-data')}
+              disabled={!isAuthenticated}
             >
               <FaFileUpload /> Form Data
             </button>
             <button
               className={`${styles.tabButton} ${activeTab === 'json-data' ? styles.active : ''}`}
               onClick={() => setActiveTab('json-data')}
+              disabled={!isAuthenticated}
             >
               <FaCode /> JSON Data
             </button>
@@ -164,6 +291,7 @@ const AuthorUpload = () => {
             className={styles.tabDropdown}
             value={activeTab}
             onChange={(e) => setActiveTab(e.target.value)}
+            disabled={!isAuthenticated}
           >
             <option value="form-data">Form Data</option>
             <option value="json-data">JSON Data</option>
@@ -180,6 +308,7 @@ const AuthorUpload = () => {
                     onChange={handleInputChange}
                     className={styles.input}
                     required
+                    disabled={!isAuthenticated}
                   />
                   {errors.name && <span className={styles.error}>{errors.name}</span>}
                 </div>
@@ -192,6 +321,7 @@ const AuthorUpload = () => {
                     onChange={handleInputChange}
                     className={styles.input}
                     accept="image/png,image/jpeg"
+                    disabled={!isAuthenticated}
                   />
                   {errors.image && <span className={styles.error}>{errors.image}</span>}
                 </div>
@@ -207,6 +337,7 @@ const AuthorUpload = () => {
                     max="5"
                     step="0.1"
                     required
+                    disabled={!isAuthenticated}
                   />
                   {errors.rating && <span className={styles.error}>{errors.rating}</span>}
                 </div>
@@ -218,6 +349,7 @@ const AuthorUpload = () => {
                     value={formData.born}
                     onChange={handleInputChange}
                     className={styles.input}
+                    disabled={!isAuthenticated}
                   />
                 </div>
                 <div className={styles.formGroup}>
@@ -228,6 +360,7 @@ const AuthorUpload = () => {
                     value={formData.died}
                     onChange={handleInputChange}
                     className={styles.input}
+                    disabled={!isAuthenticated}
                   />
                 </div>
                 <div className={styles.formGroup}>
@@ -238,6 +371,7 @@ const AuthorUpload = () => {
                     value={formData.genre}
                     onChange={handleInputChange}
                     className={styles.input}
+                    disabled={!isAuthenticated}
                   />
                 </div>
                 <div className={styles.formGroup}>
@@ -248,6 +382,7 @@ const AuthorUpload = () => {
                     onChange={handleInputChange}
                     className={styles.input}
                     rows="4"
+                    disabled={!isAuthenticated}
                   />
                 </div>
                 <div className={styles.formGroup}>
@@ -258,6 +393,7 @@ const AuthorUpload = () => {
                     onChange={handleInputChange}
                     className={styles.input}
                     rows="4"
+                    disabled={!isAuthenticated}
                   />
                 </div>
                 <div className={styles.formGroup}>
@@ -268,11 +404,12 @@ const AuthorUpload = () => {
                     onChange={handleInputChange}
                     className={styles.input}
                     rows="4"
+                    disabled={!isAuthenticated}
                   />
                 </div>
                 {errors.error && <span className={styles.error}>{errors.error}</span>}
                 {successMessage && <span className={styles.success}>{successMessage}</span>}
-                <button type="submit" className={styles.submitButton} disabled={isLoading}>
+                <button type="submit" className={styles.submitButton} disabled={isLoading || !isAuthenticated}>
                   {isLoading ? 'Uploading...' : 'Upload Author'}
                 </button>
               </form>
@@ -285,13 +422,14 @@ const AuthorUpload = () => {
                   className={styles.jsonInput}
                   rows="10"
                   placeholder='{"name": "Author Name", "rating": 4.5, "genre": "History", "notable_works": "Book1, Book2", "biography": "Bio text", "awards": "Award1"}'
+                  disabled={!isAuthenticated}
                 />
                 {errors.json && <span className={styles.error}>{errors.json}</span>}
                 {successMessage && <span className={styles.success}>{successMessage}</span>}
                 <button
                   onClick={handleJsonSubmit}
                   className={styles.submitButton}
-                  disabled={isLoading}
+                  disabled={isLoading || !isAuthenticated}
                 >
                   {isLoading ? 'Uploading...' : 'Upload JSON'}
                 </button>

@@ -2,11 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { FaFileUpload, FaCode } from 'react-icons/fa';
 import axios from 'axios';
 import { toast } from 'react-toastify';
+import { useAuth } from '../../context/AuthContext';
+import Cookies from 'js-cookie';
 import styles from '../Page.module.css';
 
 const API_STRING = "http://virsaa-prod.eba-7cc3yk92.us-east-1.elasticbeanstalk.com";
 
 const EbookUpload = () => {
+  const { isLoggedIn, accessToken, setAccessToken } = useAuth();
   const [activeTab, setActiveTab] = useState('form-data');
   const [authors, setAuthors] = useState([]);
   const [formData, setFormData] = useState({
@@ -24,12 +27,11 @@ const EbookUpload = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   // Check if user is authenticated
-  const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
-  const accessToken = localStorage.getItem('access_token');
+  const isAuthenticated = Cookies.get('isAuthenticated') === 'true';
 
   // Fetch authors for dropdown
   useEffect(() => {
-    if (!isAuthenticated || !accessToken) {
+    if (!isLoggedIn || !accessToken) {
       setErrors({ auth: 'You must be logged in to access this page.' });
       toast.error('You must be logged in to access this page.', {
         position: 'top-right',
@@ -40,14 +42,38 @@ const EbookUpload = () => {
 
     const fetchAuthors = async () => {
       try {
-        const response = await axios.get(`${API_STRING}/collections/authors/`, {
+        let response = await axios.get(`${API_STRING}/collections/authors/`, {
           headers: {
             Authorization: `Bearer ${accessToken}`,
           },
         });
-        // Ensure response.data is an array
+
+        if (response.status === 401) {
+          const refreshToken = Cookies.get('refreshToken');
+          if (!refreshToken) {
+            throw new Error('No refresh token available');
+          }
+          const refreshResponse = await axios.post(
+            `${API_STRING}/api/auth/token/refresh/`,
+            { refresh: refreshToken },
+            { headers: { 'Content-Type': 'application/json' } }
+          );
+          const newAccessToken = refreshResponse.data.access;
+          Cookies.set('accessToken', newAccessToken, { expires: 1, secure: true, sameSite: 'Strict' });
+          setAccessToken(newAccessToken);
+
+          response = await axios.get(`${API_STRING}/collections/authors/`, {
+            headers: {
+              Authorization: `Bearer ${newAccessToken}`,
+            },
+          });
+        }
+
+        console.log('Authors API response:', response.data);
         if (Array.isArray(response.data)) {
           setAuthors(response.data);
+        } else if (response.data.results && Array.isArray(response.data.results)) {
+          setAuthors(response.data.results);
         } else {
           throw new Error('Invalid authors data format');
         }
@@ -61,7 +87,7 @@ const EbookUpload = () => {
       }
     };
     fetchAuthors();
-  }, [isAuthenticated, accessToken, setAuthors]);
+  }, [isLoggedIn, accessToken, setAccessToken]);
 
   // Handle form input changes
   const handleInputChange = (e) => {
@@ -70,7 +96,6 @@ const EbookUpload = () => {
       ...prev,
       [name]: files ? files[0] : value
     }));
-    // Clear field-specific error
     setErrors(prevErrors => ({ ...prevErrors, [name]: '' }));
   };
 
@@ -91,18 +116,20 @@ const EbookUpload = () => {
 
   // Validate JSON data
   const validateJson = () => {
+    const newErrors = {}; // Define newErrors
     try {
       const parsed = JSON.parse(jsonData);
-      if (!isAuthenticated) return { json: 'You must be logged in to upload ebooks.' };
-      if (!parsed.title) return { json: 'Title is required' };
-      if (!parsed.author) return { json: 'Author ID is required' };
+      if (!isAuthenticated) newErrors.json = 'You must be logged in to upload ebooks.';
+      if (!parsed.title) newErrors.json = 'Title is required';
+      if (!parsed.author) newErrors.author = 'Author is required';
       if (!parsed.pages || isNaN(Number(parsed.pages)) || Number(parsed.pages) <= 0)
-        return { json: 'Pages must be a positive number' };
+        newErrors.json = 'Pages must be a positive number';
       if (parsed.rating < 0 || parsed.rating > 5)
-        return { json: 'Rating must be between 0 and 5' };
-      return {};
+        newErrors.json = 'Rating must be between 0 and 5';
+      return newErrors;
     } catch (error) {
-      return { json: 'Invalid JSON format' };
+      newErrors.json = 'Invalid JSON format';
+      return newErrors;
     }
   };
 
@@ -155,13 +182,8 @@ const EbookUpload = () => {
         pages: '',
         description: ''
       });
-      // Reset file inputs
-      try {
-        document.getElementById('cover_image').value = '';
-        document.getElementById('pdf_file').value = '';
-      } catch (err) {
-        console.warn('Failed to reset file inputs:', err);
-      }
+      document.getElementById('cover_image').value = '';
+      document.getElementById('pdf_file').value = '';
     } catch (error) {
       console.error('Error uploading ebook:', error.response?.data);
       if (error.response?.status === 401) {

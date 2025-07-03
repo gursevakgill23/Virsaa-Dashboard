@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuth } from '../../context/AuthContext';
+import Cookies from 'js-cookie';
 import pageStyles from '../Page.module.css';
 import styles from './Users.module.css';
 
@@ -13,10 +14,9 @@ const Users = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const apiString = 'http://virsaa-prod.eba-7cc3yk92.us-east-1.elasticbeanstalk.com';
-  const userImage = 'https://picsum.photos/40/40'; // CDN-hosted placeholder from Lorem Picsum
-  const hasFetched = useRef(false); // Track fetch to prevent loop within same route
+  const userImage = 'https://picsum.photos/40/40';
+  const hasFetched = useRef(false);
 
-  // Function to handle image paths for production
   const useProductionImagePath = () => {
     return (imagePath) => {
       if (process.env.NODE_ENV === 'production') {
@@ -33,10 +33,9 @@ const Users = () => {
   };
   const getImagePath = useProductionImagePath();
 
-  // Token refresh function (memoized to prevent ESLint warning)
   const refreshAccessToken = useCallback(async () => {
     try {
-      const refreshToken = localStorage.getItem('refreshToken');
+      const refreshToken = Cookies.get('refreshToken');
       if (!refreshToken) {
         throw new Error('No refresh token available');
       }
@@ -50,7 +49,7 @@ const Users = () => {
       const data = await response.json();
       if (response.ok) {
         setAccessToken(data.access);
-        localStorage.setItem('accessToken', data.access);
+        Cookies.set('accessToken', data.access, { expires: 1, secure: true, sameSite: 'Strict' });
         return data.access;
       } else {
         throw new Error(data.error || 'Token refresh failed');
@@ -65,9 +64,8 @@ const Users = () => {
       navigate('/login');
       return null;
     }
-  }, [userData, logout, navigate, setAccessToken, apiString]);
+  }, [userData, logout, navigate, setAccessToken]);
 
-  // Fetch users (memoized to prevent redefinition)
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     let filterType;
@@ -133,7 +131,6 @@ const Users = () => {
     }
   }, [accessToken, location.pathname, refreshAccessToken, userData, navigate]);
 
-  // Handle auth check and fetch
   useEffect(() => {
     if (!isLoggedIn || !userData?.is_staff) {
       toast.error('Access denied. Admin privileges required.', {
@@ -146,16 +143,15 @@ const Users = () => {
     }
 
     let isMounted = true;
-    // Reset hasFetched when route changes to allow new fetch
     hasFetched.current = false;
     if (isMounted) {
       fetchUsers();
     }
 
     return () => {
-      isMounted = false; // Prevent state updates on unmount
+      isMounted = false;
     };
-  }, [isLoggedIn, userData, navigate, fetchUsers, accessToken, location.pathname]);
+  }, [isLoggedIn, userData, navigate, fetchUsers]);
 
   return (
     <div className={`${pageStyles.page} ${styles.usersPage} ${userData?.theme_preference === 'dark' ? styles.dark : ''}`}>
