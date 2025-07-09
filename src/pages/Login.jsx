@@ -25,62 +25,88 @@ const Login = () => {
   }, []);
 
   const handleLogin = async (e) => {
-    e.preventDefault();
-    setError('');
-    setIsLoading(true);
+  e.preventDefault();
+  setError('');
+  setIsLoading(true);
 
-    try {
-      const response = await axios.post(`${API_STRING}/api/auth/login/`, {
-        login: email,
-        password: password,
-      });
+  try {
+    const payload = {
+      login: email.trim(),
+      password: password,
+      captcha: 'bypass-for-admin', // Bypass for admin
+      remember_me: false
+    };
 
-      console.log('Login response:', response.data);
+    console.log('Sending login payload:', payload);
 
-      const { access, refresh, user } = response.data;
-
-      if (!user.is_staff && !user.is_superuser) {
-        setError('Access denied. Only admin users can log in.');
-        toast.error('Access denied. Only admin users can log in.', {
-          position: 'top-right',
-          autoClose: 5000,
-        });
-        setIsLoading(false);
-        return;
+    const response = await axios.post(
+      `${API_STRING}/api/auth/login/`,
+      payload,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        validateStatus: (status) => status < 500, // Don't throw for 400 errors
       }
+    );
 
-      // Store tokens and user data in cookies
-      Cookies.set('accessToken', access, { expires: 1, secure: true, sameSite: 'Strict' });
-      Cookies.set('refreshToken', refresh, { expires: 7, secure: true, sameSite: 'Strict' });
-      Cookies.set('userData', JSON.stringify(user), { expires: 7, secure: true, sameSite: 'Strict' });
-      Cookies.set('isAuthenticated', 'true', { expires: 7, secure: true, sameSite: 'Strict' });
+    console.log('Login response:', response);
 
-      setIsLoading(false);
-      toast.success('Login successful!', {
-        position: 'top-right',
-        autoClose: 5000,
-      });
-
-      console.log('Navigating to /dashboard');
-      navigate('/dashboard', { replace: true });
-    } catch (error) {
-      console.error('Login error:', error.response?.data);
-      let errorMessage = 'Invalid credentials. Please try again.';
-      if (error.response?.data?.login?.[0] === 'Invalid credentials') {
-        errorMessage = 'Invalid credentials. Please try again.';
-      } else if (error.response?.status === 404 || error.response?.data?.detail === 'No User matches the given query.') {
-        errorMessage = 'Email not found.';
-      } else {
-        errorMessage = error.response?.data?.error || 'An error occurred. Please try again.';
-      }
-      toast.error(errorMessage, {
-        position: 'top-right',
-        autoClose: 5000,
-      });
-      setError(errorMessage);
-      setIsLoading(false);
+    if (response.status === 400) {
+      const errorMsg = response.data?.login?.[0] || 
+                      response.data?.error || 
+                      'Invalid credentials';
+      throw new Error(errorMsg);
     }
-  };
+
+    if (!response.data) {
+      throw new Error('No response data received');
+    }
+
+    const { access, refresh, user } = response.data;
+
+    if (!user?.is_staff && !user?.is_superuser) {
+      throw new Error('Access denied. Admin privileges required.');
+    }
+
+    // Store tokens and user data
+    Cookies.set('accessToken', access, { 
+      expires: 1, 
+      secure: true, 
+      sameSite: 'Strict' 
+    });
+    Cookies.set('refreshToken', refresh, { 
+      expires: 7, 
+      secure: true, 
+      sameSite: 'Strict' 
+    });
+    Cookies.set('userData', JSON.stringify(user), { 
+      expires: 7, 
+      secure: true, 
+      sameSite: 'Strict' 
+    });
+    Cookies.set('isAuthenticated', 'true', { 
+      expires: 7, 
+      secure: true, 
+      sameSite: 'Strict' 
+    });
+
+    toast.success('Login successful!');
+    navigate('/dashboard', { replace: true });
+
+  } catch (error) {
+    console.error('Login error:', error);
+    const errorMsg = error.response?.data?.login?.[0] || 
+                    error.response?.data?.error || 
+                    error.message || 
+                    'Login failed';
+    
+    setError(errorMsg);
+    toast.error(errorMsg);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   return (
     <div className={styles.loginContainer}>

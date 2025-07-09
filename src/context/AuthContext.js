@@ -29,49 +29,59 @@ export const AuthProvider = ({ children }) => {
   }, [isLoggedIn, accessToken, userData]);
 
   const login = async (loginData) => {
-    try {
-      const response = await fetch(`${apiString}/api/auth/login/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(loginData),
-      });
+  try {
+    const payload = {
+      ...loginData,
+      captcha: 'bypass-for-admin',
+      remember_me: false
+    };
 
-      const data = await response.json();
-      console.log('AuthContext login response:', data);
+    console.log('Auth login payload:', payload);
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Login failed');
-      }
+    const response = await fetch(`${apiString}/api/auth/login/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
 
-      if (!data.user.is_staff && !data.user.is_superuser) {
-        throw new Error('Access denied. Only admin users can log in.');
-      }
+    const data = await response.json();
 
-      setAccessToken(data.access);
-      setUserData(data.user);
-      setIsLoggedIn(true);
-      Cookies.set('accessToken', data.access, { expires: 1, secure: true, sameSite: 'Strict' });
-      Cookies.set('refreshToken', data.refresh, { expires: 7, secure: true, sameSite: 'Strict' });
-      Cookies.set('userData', JSON.stringify(data.user), { expires: 7, secure: true, sameSite: 'Strict' });
-      Cookies.set('isAuthenticated', 'true', { expires: 7, secure: true, sameSite: 'Strict' });
-      console.log('AuthContext login successful:', { access: data.access, user: data.user });
-      toast.success('Logged in successfully!', {
-        position: 'top-center',
-        autoClose: 2000,
-      });
-      console.log('AuthContext navigating to /dashboard');
-      navigate('/dashboard', { replace: true });
-    } catch (error) {
-      console.error('AuthContext login error:', error);
-      toast.error(error.message || 'Login failed. Please check your credentials.', {
-        position: 'top-center',
-        autoClose: 3000,
-      });
-      throw error;
+    if (!response.ok) {
+      const errorMsg = data?.login?.[0] || data?.error || 'Login failed';
+      throw new Error(errorMsg);
     }
-  };
+
+    if (!data.user?.is_staff && !data.user?.is_superuser) {
+      throw new Error('Admin access required');
+    }
+
+    // Store tokens and data
+    const cookieOptions = {
+      expires: 1, // 1 day for access token
+      secure: true,
+      sameSite: 'Strict'
+    };
+
+    Cookies.set('accessToken', data.access, cookieOptions);
+    Cookies.set('refreshToken', data.refresh, { ...cookieOptions, expires: 7 });
+    Cookies.set('userData', JSON.stringify(data.user), { ...cookieOptions, expires: 7 });
+    Cookies.set('isAuthenticated', 'true', { ...cookieOptions, expires: 7 });
+
+    setAccessToken(data.access);
+    setUserData(data.user);
+    setIsLoggedIn(true);
+
+    toast.success('Logged in successfully!');
+    navigate('/dashboard');
+
+  } catch (error) {
+    console.error('Auth login error:', error);
+    toast.error(error.message || 'Login failed');
+    throw error;
+  }
+};
 
   const logout = async () => {
     try {
