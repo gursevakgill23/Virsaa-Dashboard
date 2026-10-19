@@ -1,41 +1,150 @@
+/* =============================================================================
+ * Virsaa Admin — Design tokens
+ * -----------------------------------------------------------------------------
+ * These tokens are copied 1:1 from the public Virsaa web app
+ * (virsaa-web.vercel.app) so the dashboard shares the same maroon palette,
+ * typography (Fraunces + Mukta Mahee), glass surfaces, shadows and radii.
+ * Light theme lives on :root, dark theme on [data-theme="dark"] — exactly the
+ * same switch the web app uses, so a theme choice feels identical in both.
+ * ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Mukta+Mahee:wght@400;500;600;700&display=swap');
+
 :root {
-  --primary-bg: #f8f1e9; /* Soft cream background */
-  --secondary-bg: #ffffff; /* White card background */
-  --text-primary: #2c222b; /* Dark brown text */
-  --text-secondary: #5c4d5a; /* Muted purple-gray text */
-  --text-on-accent: #ffffff; /* White text on accent */
-  --text-on-button: #ffffff; /* White text on buttons */
-  --accent: #8b5e3c; /* Rich brown */
-  --accent-hover: #a6744f; /* Lighter brown on hover */
-  --button-bg: #6b4e71; /* Deep purple for buttons */
-  --button-hover: #7f5a83; /* Lighter purple on hover */
-  --gradient-start: #8b5e3c; /* Brown gradient start */
-  --gradient-end: #6b4e71; /* Purple gradient end */
-  --border: #d9d2cb; /* Light cream border */
-  --shadow: rgba(0, 0, 0, 0.15);
-  --card-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  /* ---- Typography ---- */
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body: 'Mukta Mahee', 'Segoe UI', system-ui, sans-serif;
+
+  /* ---- Brand ---- */
+  --maroon: #65041d;
+  --maroon-deep: #3f0212;
+  --maroon-bright: #8c1232;
+  --gold: #c9a24a;
+  --gold-soft: #fff3d1;
+  --primary-rgb: 101, 4, 29;
+
+  /* ---- Surfaces ---- */
+  --background-color: #ffffff;
+  --header-bg-color: #fbf5f6;
+  --section-bg-color: #ffffff;
+  --section-alt-bg: #fbf3f5;
+  --card-bg-color: #ffffff;
+  --accent-soft: #f6e7eb;
+  --table-header-bg: #f8edf0;
+
+  /* ---- Text ---- */
+  --text-color: #2b0f16;
+  --headline-color: #65041d;
+  --secondary-text-color: #6e5258;
+  --icon-color: #65041d;
+  --primary-color: #65041d;
+  --link-color: #65041d;
+  --link-hover-color: #8c1232;
+
+  /* ---- Buttons ---- */
+  --button-bg-color: #65041d;
+  --button-text-color: #ffffff;
+  --button-hover-bg-color: #ffffff;
+  --button-hover-text-color: #65041d;
+  --button-border: 2px solid #65041d;
+
+  /* ---- Inputs ---- */
+  --input-bg-color: #ffffff;
+  --input-border-color: #e8d3d9;
+  --input-focus-border-color: #65041d;
+  --border-color: #f0e1e5;
+
+  /* ---- Skeletons ---- */
+  --skeleton-bg-color: #f4e8eb;
+  --skeleton-shine-color: rgba(255, 255, 255, 0.65);
+
+  /* ---- Glass ---- */
+  --glass-bg: rgba(255, 255, 255, 0.62);
+  --glass-bg-strong: rgba(255, 255, 255, 0.84);
+  --glass-border: rgba(255, 255, 255, 0.75);
+  --glass-edge: rgba(101, 4, 29, 0.08);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.95);
+
+  /* ---- Shadows & aura ---- */
+  --shadow-soft: 0 12px 30px -14px rgba(101, 4, 29, 0.28);
+  --shadow-deep: 0 34px 60px -24px rgba(101, 4, 29, 0.38), 0 14px 26px -14px rgba(101, 4, 29, 0.22);
+  --aura: radial-gradient(60% 60% at 15% 10%, rgba(101, 4, 29, 0.1), transparent 70%),
+    radial-gradient(50% 50% at 90% 80%, rgba(140, 18, 50, 0.08), transparent 70%);
+
+  /* ---- Status colours ---- */
+  --success: #2f8f5b;
+  --success-soft: rgba(47, 143, 91, 0.12);
+  --danger: #b3261e;
+  --danger-soft: rgba(179, 38, 30, 0.1);
+  --warning: #a37b1c;
+  --warning-soft: rgba(201, 162, 74, 0.16);
+
+  /* ---- Radii (same scale as the web app) ---- */
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
+  --radius-xl: 30px;
+  --radius-pill: 999px;
+
+  /* ---- Layout ---- */
+  --sidebar-width: 280px;
+  --topbar-height: 72px;
+  --page-gutter: clamp(16px, 3vw, 32px);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+
+  color-scheme: light;
 }
 
-[data-theme="dark"] {
-  --primary-bg: #2c222b; /* Dark brown-gray background */
-  --secondary-bg: #3a3238; /* Darker purple-gray card background */
-  --text-primary: #e6e1e5; /* Light cream text */
-  --text-secondary: #a89ca5; /* Light purple-gray text */
-  --text-on-accent: #ffffff; /* White text on accent */
-  --text-on-button: #ffffff; /* White text on buttons */
-  --accent: #a6744f; /* Muted brown for dark mode */
-  --accent-hover: #8b5e3c; /* Rich brown */
-  --button-bg: #7f5a83; /* Slightly lighter purple for buttons */
-  --button-hover: #9b6a9f; /* Even lighter purple on hover */
-  --gradient-start: #6b4e71; /* Purple gradient start */
-  --gradient-end: #a6744f; /* Brown gradient end */
-  --border: #5c4d5a; /* Dark purple-gray border */
-  --shadow: rgba(255, 255, 255, 0.15);
-  --card-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-}
+[data-theme='dark'] {
+  --primary-rgb: 242, 179, 194;
 
-body {
-  background: var(--primary-bg);
-  color: var(--text-primary);
-  transition: all 0.3s ease;
+  --background-color: #14050a;
+  --header-bg-color: #1b070d;
+  --section-bg-color: #14050a;
+  --section-alt-bg: #1d0810;
+  --card-bg-color: #220a11;
+  --accent-soft: #2a0c14;
+  --table-header-bg: #2a0c14;
+
+  --text-color: #f3e6e9;
+  --headline-color: #ffffff;
+  --secondary-text-color: #c4a3ab;
+  --icon-color: #f2b3c2;
+  --primary-color: #f2b3c2;
+  --link-color: #f2b3c2;
+  --link-hover-color: #ffffff;
+
+  --button-bg-color: #ffffff;
+  --button-text-color: #65041d;
+  --button-hover-bg-color: #65041d;
+  --button-hover-text-color: #ffffff;
+  --button-border: 2px solid #ffffff;
+
+  --input-bg-color: #1d0810;
+  --input-border-color: #4a1a26;
+  --input-focus-border-color: #f2b3c2;
+  --border-color: #3a131d;
+
+  --skeleton-bg-color: #2a0c14;
+  --skeleton-shine-color: rgba(255, 255, 255, 0.06);
+
+  --glass-bg: rgba(40, 10, 18, 0.55);
+  --glass-bg-strong: rgba(36, 9, 16, 0.86);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-edge: rgba(255, 255, 255, 0.06);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+
+  --shadow-soft: 0 12px 30px -14px rgba(0, 0, 0, 0.65);
+  --shadow-deep: 0 34px 60px -24px rgba(0, 0, 0, 0.75), 0 14px 26px -14px rgba(0, 0, 0, 0.5);
+  --aura: radial-gradient(60% 60% at 15% 10%, rgba(140, 18, 50, 0.35), transparent 70%),
+    radial-gradient(50% 50% at 90% 80%, rgba(101, 4, 29, 0.35), transparent 70%);
+
+  --success: #6fd6a0;
+  --success-soft: rgba(111, 214, 160, 0.12);
+  --danger: #ffb4a9;
+  --danger-soft: rgba(255, 180, 169, 0.1);
+  --warning: #f1d58c;
+  --warning-soft: rgba(241, 213, 140, 0.12);
+
+  color-scheme: dark;
 }

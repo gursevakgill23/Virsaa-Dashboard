@@ -1,0 +1,30 @@
+.wrap {
+  display: grid;
+  place-items: center;
+  min-height: 60vh;
+}
+
+.mark {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+  background: linear-gradient(150deg, var(--maroon-bright), var(--maroon) 60%, var(--maroon-deep));
+  color: var(--gold-soft);
+  font-size: 2rem;
+  box-shadow: 0 0 0 0 rgba(var(--primary-rgb), 0.4);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(var(--primary-rgb), 0.35);
+  }
+  70% {
+    box-shadow: 0 0 0 18px rgba(var(--primary-rgb), 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(var(--primary-rgb), 0);
+  }
+}

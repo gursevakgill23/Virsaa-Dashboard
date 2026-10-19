@@ -1,240 +1,248 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { toast } from 'react-toastify';
-import { useAuth } from '../../context/AuthContext';
-import Cookies from 'js-cookie';
-import pageStyles from '../Page.module.css';
+/**
+ * Users — members list for All / Basic / Premium, with search, sort and
+ * CSV export. The filter comes from the URL: /users/all | basic | premium.
+ */
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Navigate, useParams } from 'react-router-dom';
+import { FaUsers, FaSearch, FaSyncAlt, FaDownload, FaCrown, FaShieldAlt } from 'react-icons/fa';
+import { api, getErrorMessage, toList } from '../../api/client';
+import PageHeader from '../../components/ui/PageHeader';
+import Avatar from '../../components/ui/Avatar';
+import pageStyles from '../../styles/Page.module.css';
 import styles from './Users.module.css';
 
+const FILTERS = {
+  all: { title: 'All members', subtitle: 'Everyone with a Virsaa account.' },
+  basic: { title: 'Basic plan', subtitle: 'Members on the free Basic plan.' },
+  premium: { title: 'Premium members', subtitle: 'Members with an active Premium subscription.' },
+};
+
+const fullName = (u) => [u.first_name, u.last_name].filter(Boolean).join(' ') || u.username || '—';
+
+/**
+ * Escapes a value for CSV and neutralises spreadsheet formula injection
+ * (cells starting with = + - @ are prefixed with ').
+ */
+const csvCell = (value) => {
+  let text = value === null || value === undefined ? '' : String(value);
+  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
+  return `"${text.replace(/"/g, '""')}"`;
+};
+
 const Users = () => {
-  const { isLoggedIn, accessToken, userData, logout, setAccessToken } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
+  const { filterType } = useParams();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const apiString = 'http://virsaa-prod.eba-7cc3yk92.us-east-1.elasticbeanstalk.com';
-  const userImage = 'https://picsum.photos/40/40';
-  const hasFetched = useRef(false);
+  const [error, setError] = useState('');
+  const [query, setQuery] = useState('');
+  const [sort, setSort] = useState('newest');
+  const requestId = useRef(0);
 
-  const useProductionImagePath = () => {
-    return (imagePath) => {
-      if (process.env.NODE_ENV === 'production') {
-        if (typeof imagePath === 'string') {
-          return imagePath.startsWith('/')
-            ? imagePath
-            : `/${imagePath.replace(/.*static\/media/, 'static/media')}`;
-        } else {
-          return imagePath.default || imagePath;
-        }
-      }
-      return imagePath;
-    };
-  };
-  const getImagePath = useProductionImagePath();
+  const filter = FILTERS[filterType] ? filterType : null;
 
-  const refreshAccessToken = useCallback(async () => {
-    try {
-      const refreshToken = Cookies.get('refreshToken');
-      if (!refreshToken) {
-        throw new Error('No refresh token available');
-      }
-      const response = await fetch(`${apiString}/api/auth/token/refresh/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ refresh: refreshToken }),
-      });
-      const data = await response.json();
-      if (response.ok) {
-        setAccessToken(data.access);
-        Cookies.set('accessToken', data.access, { expires: 1, secure: true, sameSite: 'Strict' });
-        return data.access;
-      } else {
-        throw new Error(data.error || 'Token refresh failed');
-      }
-    } catch (err) {
-      await logout();
-      toast.error('Session expired. Please log in again.', {
-        position: 'top-center',
-        autoClose: 3000,
-        theme: userData?.theme_preference === 'dark' ? 'dark' : 'light',
-      });
-      navigate('/login');
-      return null;
-    }
-  }, [userData, logout, navigate, setAccessToken]);
-
-  const fetchUsers = useCallback(async () => {
+  const load = useCallback(async () => {
+    if (!filter) return;
+    const id = ++requestId.current;
     setLoading(true);
-    let filterType;
-    if (location.pathname === '/users/all') {
-      filterType = 'all';
-    } else if (location.pathname === '/users/basic') {
-      filterType = 'basic';
-    } else if (location.pathname === '/users/premium') {
-      filterType = 'premium';
-    } else {
-      filterType = 'all';
-    }
-
+    setError('');
     try {
-      const response = await fetch(`${apiString}/api/auth/users/${filterType}/`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      const data = await response.json();
-
-      if (response.status === 401) {
-        const newAccessToken = await refreshAccessToken();
-        if (newAccessToken) {
-          const retryResponse = await fetch(`${apiString}/api/auth/users/${filterType}/`, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${newAccessToken}`,
-              'Content-Type': 'application/json',
-            },
-          });
-          const retryData = await retryResponse.json();
-          if (retryResponse.ok) {
-            setUsers(retryData);
-            setLoading(false);
-          } else {
-            throw new Error(retryData.error || 'Retry failed after token refresh');
-          }
-        }
-      } else if (response.status === 403) {
-        toast.error('Access denied. Admin privileges required.', {
-          position: 'top-center',
-          autoClose: 3000,
-          theme: userData?.theme_preference === 'dark' ? 'dark' : 'light',
-        });
-        navigate('/');
-      } else if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch users');
-      } else {
-        setUsers(data);
-        setLoading(false);
-      }
+      const { data } = await api.get(`/api/auth/users/${filter}/`);
+      if (id === requestId.current) setUsers(toList(data));
     } catch (err) {
-      setError(err.message);
-      setLoading(false);
-      toast.error('Failed to load users. Please try again.', {
-        position: 'top-center',
-        autoClose: 3000,
-        theme: userData?.theme_preference === 'dark' ? 'dark' : 'light',
-      });
+      if (id === requestId.current) {
+        setUsers([]);
+        setError(getErrorMessage(err, 'Could not load members.'));
+      }
+    } finally {
+      if (id === requestId.current) setLoading(false);
     }
-  }, [accessToken, location.pathname, refreshAccessToken, userData, navigate]);
+  }, [filter]);
 
   useEffect(() => {
-    if (!isLoggedIn || !userData?.is_staff) {
-      toast.error('Access denied. Admin privileges required.', {
-        position: 'top-center',
-        autoClose: 3000,
-        theme: userData?.theme_preference === 'dark' ? 'dark' : 'light',
-      });
-      navigate('/login');
-      return;
-    }
+    setQuery('');
+    load();
+  }, [load]);
 
-    let isMounted = true;
-    hasFetched.current = false;
-    if (isMounted) {
-      fetchUsers();
-    }
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const list = q
+      ? users.filter((u) => `${fullName(u)} ${u.username || ''} ${u.email || ''}`.toLowerCase().includes(q))
+      : users.slice();
+    list.sort((a, b) => {
+      if (sort === 'name') return fullName(a).localeCompare(fullName(b));
+      const diff = new Date(b.joined_date || 0) - new Date(a.joined_date || 0);
+      return sort === 'oldest' ? -diff : diff;
+    });
+    return list;
+  }, [users, query, sort]);
 
-    return () => {
-      isMounted = false;
-    };
-  }, [isLoggedIn, userData, navigate, fetchUsers]);
+  /** Downloads the currently visible rows as a CSV file (built locally). */
+  const exportCsv = () => {
+    const header = ['Name', 'Username', 'Email', 'Membership', 'Joined', 'Staff', 'Superuser'];
+    const rows = visible.map((u) => [
+      fullName(u),
+      u.username,
+      u.email,
+      u.membership_level,
+      u.joined_date ? new Date(u.joined_date).toISOString().slice(0, 10) : '',
+      u.is_staff ? 'yes' : 'no',
+      u.is_superuser ? 'yes' : 'no',
+    ]);
+    const csv = [header, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n');
+    const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `virsaa-members-${filter}-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  if (!filter) return <Navigate to="/users/all" replace />;
 
   return (
-    <div className={`${pageStyles.page} ${styles.usersPage} ${userData?.theme_preference === 'dark' ? styles.dark : ''}`}>
-      <h1 className={styles.usersTitle}>
-        {location.pathname === '/users/all' ? 'All Users' : location.pathname === '/users/basic' ? 'Free Plan Users' : 'Membership Users'}
-      </h1>
+    <>
+      <PageHeader
+        eyebrow="Members"
+        icon={FaUsers}
+        title={FILTERS[filter].title}
+        subtitle={FILTERS[filter].subtitle}
+        actions={
+          <>
+            <button type="button" className={`${pageStyles.button} ${pageStyles.buttonGhost}`} onClick={load} disabled={loading}>
+              <FaSyncAlt aria-hidden="true" /> Refresh
+            </button>
+            <button
+              type="button"
+              className={`${pageStyles.button} ${pageStyles.buttonGradient}`}
+              onClick={exportCsv}
+              disabled={loading || visible.length === 0}
+            >
+              <FaDownload aria-hidden="true" /> Export CSV
+            </button>
+          </>
+        }
+      />
 
-      {loading && (
-        <div className={styles.usersLoading}>
-          <div className={styles.usersSpinner}></div>
+      <section className={`${pageStyles.card} ${pageStyles.fadeIn}`}>
+        <div className={styles.toolbar}>
+          <div className={styles.search}>
+            <FaSearch aria-hidden="true" />
+            <input
+              type="search"
+              placeholder="Search by name, username or email…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              aria-label="Search members"
+              maxLength={100}
+            />
+          </div>
+          <label className={styles.sort}>
+            <span>Sort</span>
+            <select value={sort} onChange={(e) => setSort(e.target.value)}>
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              <option value="name">Name A–Z</option>
+            </select>
+          </label>
+          <span className={styles.count}>{loading ? 'Loading…' : `${visible.length.toLocaleString()} of ${users.length.toLocaleString()}`}</span>
         </div>
-      )}
 
-      {error && (
-        <div className={styles.usersError}>
-          Error: {error}
-        </div>
-      )}
+        {error && (
+          <div className={pageStyles.errorBox} role="alert">
+            {error}
+          </div>
+        )}
 
-      {!loading && !error && users.length === 0 && (
-        <div className={styles.usersEmpty}>
-          No users found.
-        </div>
-      )}
-
-      {!loading && !error && users.length > 0 && (
-        <div className={styles.usersTableWrapper}>
-          <table className={styles.usersTable}>
-            <thead>
-              <tr>
-                <th>Avatar</th>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Membership</th>
-                <th className={styles.hideOnMobile}>About</th>
-                <th>Joined</th>
-                <th className={styles.hideOnMobile}>Preferred Content</th>
-                <th>Badges</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((user) => (
-                <tr key={user.id} className={styles.tableRow}>
-                  <td>
-                    <img
-                      src={user.profile_photo ? getImagePath(user.profile_photo) : getImagePath(userImage)}
-                      alt={`${user.username}'s profile`}
-                      className={styles.userAvatar}
-                    />
-                  </td>
-                  <td>
-                    {user.first_name && user.last_name
-                      ? `${user.first_name} ${user.last_name}`
-                      : user.username}
-                  </td>
-                  <td>{user.email}</td>
-                  <td>{user.membership_level}</td>
-                  <td className={styles.hideOnMobile}>
-                    {user.about_me ? `${user.about_me.substring(0, 50)}${user.about_me.length > 50 ? '...' : ''}` : '-'}
-                  </td>
-                  <td>{new Date(user.joined_date).toLocaleDateString()}</td>
-                  <td className={styles.hideOnMobile}>
-                    {user.preferred_content && user.preferred_content.length > 0
-                      ? user.preferred_content.join(', ')
-                      : '-'}
-                  </td>
-                  <td>
-                    <div className={styles.userBadges}>
-                      {user.is_superuser && (
-                        <span className={`${styles.userBadge} ${styles.userBadgeSuperuser}`}>Superuser</span>
-                      )}
-                      {user.is_staff && !user.is_superuser && (
-                        <span className={`${styles.userBadge} ${styles.userBadgeStaff}`}>Staff</span>
-                      )}
-                    </div>
-                  </td>
+        {!error && (
+          <div className={pageStyles.tableWrap}>
+            <table className={pageStyles.table}>
+              <thead>
+                <tr>
+                  <th scope="col">Member</th>
+                  <th scope="col">Plan</th>
+                  <th scope="col" className={styles.hideSm}>
+                    Joined
+                  </th>
+                  <th scope="col" className={styles.hideMd}>
+                    Interests
+                  </th>
+                  <th scope="col">Role</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
+              </thead>
+              <tbody>
+                {loading &&
+                  [0, 1, 2, 3, 4].map((i) => (
+                    <tr key={`s${i}`} aria-hidden="true">
+                      <td colSpan={5}>
+                        <span className={pageStyles.skeleton} style={{ display: 'block', height: 18 }} />
+                      </td>
+                    </tr>
+                  ))}
+
+                {!loading && visible.length === 0 && (
+                  <tr>
+                    <td colSpan={5}>
+                      <div className={pageStyles.empty}>
+                        <p className={pageStyles.emptyTitle}>{query ? 'No matching members' : 'No members yet'}</p>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+
+                {!loading &&
+                  visible.map((u) => {
+                    const isPremium = String(u.membership_level || '').toLowerCase().includes('premium');
+                    const interests = Array.isArray(u.preferred_content) ? u.preferred_content : [];
+                    return (
+                      <tr key={u.id ?? u.email}>
+                        <td>
+                          <div className={styles.member}>
+                            <Avatar src={u.profile_photo} name={fullName(u)} size={38} />
+                            <div className={styles.memberText}>
+                              <strong>{fullName(u)}</strong>
+                              <small>{u.email}</small>
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          <span className={`${pageStyles.pill} ${isPremium ? pageStyles.pillGold : ''}`}>
+                            {isPremium && <FaCrown aria-hidden="true" />} {u.membership_level || 'Basic'}
+                          </span>
+                        </td>
+                        <td className={styles.hideSm}>{u.joined_date ? new Date(u.joined_date).toLocaleDateString() : '—'}</td>
+                        <td className={styles.hideMd}>
+                          <div className={styles.chips}>
+                            {interests.slice(0, 3).map((item) => (
+                              <span key={String(item)} className={styles.chip}>
+                                {String(item)}
+                              </span>
+                            ))}
+                            {interests.length > 3 && <span className={styles.chip}>+{interests.length - 3}</span>}
+                            {interests.length === 0 && '—'}
+                          </div>
+                        </td>
+                        <td>
+                          {u.is_superuser ? (
+                            <span className={`${pageStyles.pill} ${pageStyles.pillGold}`}>
+                              <FaShieldAlt aria-hidden="true" /> Superuser
+                            </span>
+                          ) : u.is_staff ? (
+                            <span className={pageStyles.pill}>
+                              <FaShieldAlt aria-hidden="true" /> Staff
+                            </span>
+                          ) : (
+                            <span className={styles.muted}>Member</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </>
   );
 };
 

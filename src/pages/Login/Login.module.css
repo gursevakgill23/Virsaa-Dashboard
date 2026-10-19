@@ -1,0 +1,503 @@
+/* =============================================================================
+ * Login — maroon "doorway" stage (from the web app's loader) + glass card
+ * ========================================================================== */
+
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  min-height: 100vh;
+  background: var(--background-color);
+}
+
+/* ---------------- Left: brand stage ---------------- */
+.stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 48px 32px;
+  perspective: 900px;
+  color: #fff;
+  background: radial-gradient(120% 80% at 50% 110%, #3f0212 0, transparent 60%),
+    radial-gradient(90% 70% at 50% 40%, #2a0612 0, #14040a 70%);
+}
+
+.aura {
+  position: absolute;
+  width: min(120vw, 900px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(140, 18, 50, 0.55) 0, rgba(101, 4, 29, 0.2) 35%, transparent 65%);
+  filter: blur(10px);
+  animation: breathe 3.2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.orb {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, rgba(255, 243, 209, 0.9), rgba(201, 162, 74, 0.25) 45%, transparent 70%);
+  pointer-events: none;
+}
+
+.orbOne {
+  top: 20%;
+  left: 16%;
+  width: 14px;
+  height: 14px;
+  opacity: 0.55;
+  animation: drift 7s ease-in-out infinite;
+}
+
+.orbTwo {
+  right: 14%;
+  bottom: 24%;
+  width: 40px;
+  height: 40px;
+  opacity: 0.35;
+  filter: blur(5px);
+  animation: drift 6s ease-in-out -2s infinite reverse;
+}
+
+.doorway {
+  position: relative;
+  width: 200px;
+  height: 260px;
+  animation: rise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both, float 4s ease-in-out 0.7s infinite;
+}
+
+.glow {
+  position: absolute;
+  inset: 18% 10% 0;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 40%, rgba(255, 220, 160, 0.45), rgba(201, 162, 74, 0.12) 45%, transparent 70%);
+  filter: blur(22px);
+}
+
+.glass {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.04) 45%, rgba(255, 255, 255, 0.08)),
+    rgba(101, 4, 29, 0.28);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  clip-path: path('M14 252 V118 C14 64 58 40 100 10 C142 40 186 64 186 118 V252 Z');
+}
+
+.mark {
+  margin-top: 30px;
+  font-size: 4.2rem;
+  color: var(--gold-soft);
+  text-shadow: 0 0 24px rgba(255, 220, 150, 0.6);
+}
+
+.outline {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.outline path {
+  fill: none;
+  stroke: rgba(255, 220, 150, 0.8);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 6px rgba(255, 220, 150, 0.85));
+}
+
+.floor {
+  width: 220px;
+  height: 26px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(201, 162, 74, 0.35), rgba(140, 18, 50, 0.15) 50%, transparent 72%);
+  filter: blur(6px);
+}
+
+.wordmark {
+  position: relative;
+  margin-top: 18px;
+  text-align: center;
+  animation: textIn 0.7s ease 0.45s both;
+}
+
+.name {
+  font-family: var(--font-display);
+  font-size: 2.4rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #fff;
+}
+
+.gurmukhi {
+  color: var(--gold-soft);
+  font-size: 1.02rem;
+  opacity: 0.85;
+}
+
+.tagline {
+  position: relative;
+  max-width: 34ch;
+  margin-top: 22px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.72);
+  line-height: 1.6;
+}
+
+/* ---------------- Right: sign-in panel ---------------- */
+.panel {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  place-items: center;
+  padding: 48px clamp(16px, 5vw, 64px);
+  background: var(--aura), var(--background-color);
+}
+
+.themeToggle {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--glass-border);
+  border-radius: 50%;
+  background: var(--glass-bg);
+  box-shadow: var(--glass-highlight);
+  color: var(--icon-color);
+  cursor: pointer;
+}
+
+.card {
+  width: min(440px, 100%);
+  padding: clamp(26px, 4vw, 40px);
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--glass-highlight), 0 0 0 1px var(--glass-edge), var(--shadow-deep);
+  backdrop-filter: blur(28px) saturate(170%);
+  -webkit-backdrop-filter: blur(28px) saturate(170%);
+  animation: cardIn 0.5s var(--ease-out) both;
+}
+
+.eyebrow {
+  color: var(--primary-color);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.title {
+  margin-top: 6px;
+  font-size: clamp(1.8rem, 4vw, 2.3rem);
+}
+
+.subtitle {
+  margin-top: 8px;
+  color: var(--secondary-text-color);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-top: 26px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.field label {
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.inputWrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 52px;
+  padding: 0 8px 0 18px;
+  border: 1px solid var(--input-border-color);
+  border-radius: var(--radius-pill);
+  background: var(--input-bg-color);
+  color: var(--primary-color);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.inputWrap:focus-within {
+  border-color: var(--input-focus-border-color);
+  box-shadow: 0 0 0 4px rgba(var(--primary-rgb), 0.14);
+}
+
+.inputWrap input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-color);
+  font-size: 1rem;
+}
+
+.reveal {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--secondary-text-color);
+  cursor: pointer;
+}
+
+.reveal:hover {
+  background: rgba(var(--primary-rgb), 0.08);
+  color: var(--primary-color);
+}
+
+.warning {
+  color: var(--warning);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+/* ---------------- reCAPTCHA frame ----------------
+ * Google's widget is a fixed 304×78 iframe with a square grey border.
+ * The frame is 2px smaller and pulls the widget back by 1px on every side,
+ * so its square border is cropped away and our rounded border shows instead. */
+.captchaLabel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.captchaOk {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--success);
+  font-size: 0.82rem;
+}
+
+.captchaFrame {
+  width: 302px;
+  max-width: 100%;
+  height: 76px;
+  overflow: hidden;
+  border: 1px solid var(--input-border-color);
+  border-radius: 18px;
+  background: #f9f9f9; /* Google's light widget colour, so cropped edges blend */
+  box-shadow: 0 6px 16px -12px rgba(var(--primary-rgb), 0.5);
+}
+
+.captchaFrameDark {
+  background: #222222; /* Google's dark widget colour */
+}
+
+.captchaFrame > div {
+  margin: -1px;
+}
+
+/* Narrow phones: shrink the widget so it never overflows the card */
+@media (max-width: 380px) {
+  .captchaFrame {
+    width: 266px;
+    height: 67px;
+  }
+
+  .captchaFrame > div {
+    transform: scale(0.88);
+    transform-origin: 1px 1px;
+  }
+}
+
+.error {
+  padding: 10px 14px;
+  border-left: 4px solid var(--danger);
+  border-radius: 12px;
+  background: var(--danger-soft);
+  color: var(--text-color);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 52px;
+  margin-top: 4px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(150deg, var(--maroon-bright), var(--maroon) 55%, var(--maroon-deep));
+  box-shadow: 0 10px 20px -12px rgba(63, 2, 18, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.submit:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.submit:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.footnote {
+  margin-top: 20px;
+  color: var(--secondary-text-color);
+  font-size: 0.82rem;
+  text-align: center;
+}
+
+/* ---------------- Animations ---------------- */
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 0.85;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+}
+
+@keyframes drift {
+  0%,
+  100% {
+    transform: translate(0);
+  }
+  50% {
+    transform: translate(12px, -18px);
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes textIn {
+  from {
+    opacity: 0;
+    letter-spacing: 0.2em;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes cardIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------------- Responsive: stage becomes a compact header ---------------- */
+@media (max-width: 900px) {
+  .page {
+    grid-template-columns: minmax(0, 1fr);
+    overflow-x: hidden;
+  }
+
+  .stage {
+    min-height: 300px;
+    padding: 36px 20px 28px;
+  }
+
+  .doorway {
+    width: 120px;
+    height: 156px;
+  }
+
+  .glass {
+    clip-path: path('M8 151 V71 C8 38 35 24 60 6 C85 24 112 38 112 71 V151 Z');
+  }
+
+  .mark {
+    margin-top: 18px;
+    font-size: 2.6rem;
+  }
+
+  .floor {
+    width: 140px;
+  }
+
+  .name {
+    font-size: 1.9rem;
+  }
+
+  .tagline {
+    display: none;
+  }
+
+  .panel {
+    padding: 72px 16px 48px;
+  }
+
+  .themeToggle {
+    top: 16px;
+    right: 16px;
+  }
+}

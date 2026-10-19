@@ -1,0 +1,546 @@
+/* =============================================================================
+ * Upload form styles — inputs, dropzone, switch, quiz builder, progress.
+ * Inputs use the web app's input tokens (rounded 14px, maroon focus ring).
+ * ========================================================================== */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px 20px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+
+.fieldFull {
+  grid-column: 1 / -1;
+}
+
+.label {
+  color: var(--text-color);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.required {
+  margin-left: 3px;
+  color: var(--maroon-bright);
+}
+
+[data-theme='dark'] .required {
+  color: #f2b3c2;
+}
+
+/* ---------------- Inputs ---------------- */
+.input {
+  width: 100%;
+  padding: 11px 14px;
+  background: var(--input-bg-color);
+  border: 1px solid var(--input-border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-color);
+  font-size: 0.97rem;
+  line-height: 1.45;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.input::placeholder {
+  color: var(--secondary-text-color);
+  opacity: 0.75;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--input-focus-border-color);
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.15);
+}
+
+.input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+textarea.input {
+  min-height: 96px;
+  resize: vertical;
+}
+
+select.input {
+  appearance: none;
+  padding-right: 40px;
+  background-image: linear-gradient(45deg, transparent 50%, var(--secondary-text-color) 50%),
+    linear-gradient(135deg, var(--secondary-text-color) 50%, transparent 50%);
+  background-position: calc(100% - 20px) 50%, calc(100% - 15px) 50%;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+
+.inputError {
+  border-color: var(--danger) !important;
+}
+
+.gurmukhi {
+  font-family: 'Mukta Mahee', 'Noto Sans Gurmukhi', var(--font-body);
+  font-size: 1.08rem;
+}
+
+.hint,
+.counter {
+  color: var(--secondary-text-color);
+  font-size: 0.8rem;
+}
+
+.counter {
+  align-self: flex-end;
+}
+
+.error {
+  color: var(--danger);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.inlineRow {
+  display: flex;
+  gap: 8px;
+}
+
+.iconSquare {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 46px;
+  border: 1px solid var(--input-border-color);
+  border-radius: var(--radius-md);
+  background: var(--input-bg-color);
+  color: var(--icon-color);
+  cursor: pointer;
+}
+
+.iconSquare:hover:not(:disabled) {
+  background: rgba(var(--primary-rgb), 0.08);
+}
+
+/* ---------------- Toggle switch ---------------- */
+.switchRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 46px;
+  cursor: pointer;
+}
+
+.switchInput {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 46px;
+  height: 26px;
+  border-radius: var(--radius-pill);
+  background: var(--input-border-color);
+  transition: background 0.2s ease;
+}
+
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s var(--ease-out);
+}
+
+.switchInput:checked + .switch {
+  background: linear-gradient(150deg, var(--maroon-bright), var(--maroon));
+}
+
+[data-theme='dark'] .switchInput:checked + .switch {
+  background: #f2b3c2;
+}
+
+.switchInput:checked + .switch::after {
+  transform: translateX(20px);
+}
+
+.switchInput:focus-visible + .switch {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 3px;
+}
+
+.switchLabel {
+  font-weight: 700;
+}
+
+/* ---------------- Dropzone ---------------- */
+.dropzone {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 26px 20px;
+  border: 1.5px dashed rgba(var(--primary-rgb), 0.4);
+  border-radius: 16px;
+  background: rgba(var(--primary-rgb), 0.04);
+  color: var(--secondary-text-color);
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.dropzone svg {
+  color: var(--primary-color);
+  font-size: 1.7rem;
+}
+
+.dropzone strong {
+  color: var(--primary-color);
+}
+
+.dropzone small {
+  font-size: 0.8rem;
+}
+
+.dropzone input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.dropzone:focus-within {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+.dropzoneActive {
+  background: rgba(var(--primary-rgb), 0.1);
+  border-color: var(--primary-color);
+}
+
+.dropzoneInvalid {
+  border-color: var(--danger);
+}
+
+.fileCard {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  background: var(--card-bg-color);
+  box-shadow: var(--shadow-soft);
+}
+
+.filePreview {
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.fileIcon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  background: rgba(var(--primary-rgb), 0.1);
+  color: var(--primary-color);
+  font-size: 1.5rem;
+}
+
+.fileMeta {
+  flex: 1;
+  min-width: 0;
+}
+
+.fileMeta strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileMeta small {
+  color: var(--secondary-text-color);
+}
+
+.fileRemove {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(var(--primary-rgb), 0.08);
+  color: var(--primary-color);
+  cursor: pointer;
+}
+
+.fileRemove:hover:not(:disabled) {
+  background: rgba(var(--primary-rgb), 0.16);
+}
+
+/* ---------------- Quiz builder ---------------- */
+.questions {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.questionCard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--border-color);
+  border-left: 4px solid var(--gold);
+  border-radius: 18px;
+  background: var(--card-bg-color);
+}
+
+.questionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.questionLegend {
+  font-family: var(--font-display);
+  font-weight: 600;
+  color: var(--headline-color);
+}
+
+.questionTools {
+  display: flex;
+  gap: 4px;
+}
+
+.questionTools button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--secondary-text-color);
+  cursor: pointer;
+}
+
+.questionTools button:hover:not(:disabled) {
+  background: rgba(var(--primary-rgb), 0.1);
+  color: var(--primary-color);
+}
+
+.questionTools button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.optionsHint {
+  color: var(--secondary-text-color);
+  font-size: 0.8rem;
+}
+
+.options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  list-style: none;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px 4px 4px;
+  border: 1px solid var(--input-border-color);
+  border-radius: var(--radius-pill);
+  background: var(--input-bg-color);
+}
+
+.optionCorrect {
+  border-color: var(--success);
+  box-shadow: 0 0 0 3px var(--success-soft);
+}
+
+.correctToggle {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(var(--primary-rgb), 0.08);
+  color: var(--primary-color);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.optionCorrect .correctToggle {
+  background: var(--success);
+  color: #fff;
+}
+
+.optionInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-color);
+}
+
+.optionRemove {
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--secondary-text-color);
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.linkButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  border: none;
+  background: none;
+  color: var(--link-color);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.addQuestion {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 52px;
+  border: 1.5px dashed rgba(var(--primary-rgb), 0.4);
+  border-radius: 18px;
+  background: transparent;
+  color: var(--primary-color);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.addQuestion small {
+  color: var(--secondary-text-color);
+  font-weight: 500;
+}
+
+.addQuestion:hover:not(:disabled) {
+  background: rgba(var(--primary-rgb), 0.05);
+}
+
+/* ---------------- JSON mode ---------------- */
+.jsonIntro {
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: rgba(var(--primary-rgb), 0.07);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.jsonInput {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.86rem;
+  min-height: 280px;
+}
+
+.jsonErrors {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px 12px 32px;
+  border-left: 4px solid var(--danger);
+  border-radius: var(--radius-md);
+  background: var(--danger-soft);
+  color: var(--text-color);
+  font-size: 0.86rem;
+}
+
+/* ---------------- Progress & actions ---------------- */
+.progress {
+  position: relative;
+  height: 34px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--skeleton-bg-color);
+}
+
+.progressBar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: linear-gradient(90deg, var(--maroon-bright), var(--maroon));
+  transition: width 0.25s ease;
+}
+
+.progress span {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: var(--text-color);
+  font-size: 0.85rem;
+  font-weight: 700;
+  mix-blend-mode: normal;
+}
+
+.progressBar + span {
+  text-shadow: 0 0 6px var(--background-color);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  border-top: 1px solid var(--border-color);
+  padding-top: 18px;
+}
+
+@media (max-width: 720px) {
+  .grid,
+  .options {
+    grid-template-columns: 1fr;
+  }
+
+  .actions > * {
+    flex: 1 1 auto;
+  }
+}

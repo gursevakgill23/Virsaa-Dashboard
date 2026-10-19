@@ -1,94 +1,249 @@
+/* Sidebar — glass panel matching the web app's side sheet */
+
 .sidebar {
-  width: 250px;
-  height: 100vh;
-  background: var(--secondary-bg);
-  color: var(--text-primary);
-  box-shadow: 2px 0 10px var(--shadow);
   position: fixed;
-  top: 0;
-  left: 0;
-  overflow-y: auto;
-  transition: all 0.3s ease;
-  z-index: 1001; /* Above navbar */
+  top: 14px;
+  bottom: 14px;
+  left: 14px;
+  width: var(--sidebar-width);
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--glass-highlight), 0 0 0 1px var(--glass-edge), var(--shadow-deep);
+  backdrop-filter: blur(28px) saturate(170%);
+  -webkit-backdrop-filter: blur(28px) saturate(170%);
+  color: var(--text-color);
 }
 
-.collapsed {
-  display: none;
+/* Soft maroon glow behind the panel content */
+.sidebar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--aura);
+  pointer-events: none;
 }
 
-.overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 1000; /* Below sidebar, above navbar */
-  display: none;
+.header,
+.nav,
+.siteCard {
+  position: relative;
+  z-index: 1;
 }
 
-.logo {
-  padding: 20px;
-  text-align: center;
-  border-bottom: 1px solid var(--border);
+.header {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
+  padding: 20px 20px 12px;
 }
 
-.logo h2 {
-  font-size: 1.5rem;
-  margin: 0;
-  color: var(--accent);
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brandMark {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: linear-gradient(150deg, var(--maroon-bright), var(--maroon) 60%, var(--maroon-deep));
+  color: var(--gold-soft);
+  font-size: 1.35rem;
+  box-shadow: 0 10px 20px -12px rgba(63, 2, 18, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.brandName {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--headline-color);
+}
+
+.brandSub {
+  margin-top: 3px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--secondary-text-color);
+}
+
+.closeButton {
+  display: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  box-shadow: var(--glass-highlight);
+  color: var(--icon-color);
+  cursor: pointer;
 }
 
 .nav {
-  padding: 20px 0;
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 14px 16px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(var(--primary-rgb), 0.3) transparent;
 }
 
-.navLink {
-  display: flex;
-  align-items: center;
-  padding: 12px 20px;
-  color: var(--text-primary);
-  text-decoration: none;
-  transition: background 0.2s ease;
-}
-
-.navLink:hover {
-  background: var(--accent);
-  color: var(--text-on-accent);
-}
-
-.navLink.active {
-  background: var(--accent);
-  color: var(--text-on-accent);
-  font-weight: bold;
-}
-
-.icon {
-  margin-right: 10px;
-  font-size: 1.2rem;
-}
-
-.section {
-  margin: 20px 0;
+.section + .section {
+  margin-top: 14px;
 }
 
 .sectionTitle {
-  padding: 10px 20px;
-  color: var(--text-secondary);
-  font-size: 1.1rem; /* Fixed from 11.1rem */
-  font-weight: 600;
+  padding: 0 10px 6px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
+  color: var(--secondary-text-color);
 }
 
-@media (max-width: 768px) {
+.list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 6px 10px;
+  border-radius: 16px;
+  color: var(--text-color);
+  font-size: 0.97rem;
+  font-weight: 600;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.link:hover {
+  background: rgba(var(--primary-rgb), 0.08);
+  color: var(--primary-color);
+}
+
+.linkIcon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  background: rgba(var(--primary-rgb), 0.08);
+  color: var(--icon-color);
+  font-size: 0.95rem;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.linkLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.active {
+  background: rgba(var(--primary-rgb), 0.12);
+  color: var(--primary-color);
+}
+
+.active .linkIcon {
+  background: linear-gradient(150deg, var(--maroon-bright), var(--maroon) 60%, var(--maroon-deep));
+  color: #fff;
+}
+
+[data-theme='dark'] .active .linkIcon {
+  background: #f2b3c2;
+  color: #2b0f16;
+}
+
+/* "View live site" card — same gradient as the web app's premium card */
+.siteCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 14px 14px;
+  padding: 14px 16px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: linear-gradient(140deg, rgba(101, 4, 29, 0.94), rgba(63, 2, 18, 0.97));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), var(--shadow-soft);
+  color: #fff;
+  transition: transform 0.2s ease;
+}
+
+.siteCard:hover {
+  transform: translateY(-2px);
+}
+
+.siteCard strong {
+  display: block;
+  font-family: var(--font-display);
+  font-weight: 600;
+}
+
+.siteCard small {
+  display: block;
+  font-size: 0.8rem;
+  opacity: 0.85;
+}
+
+.backdrop {
+  display: none;
+}
+
+/* ---------------- Mobile: floating sheet ---------------- */
+@media (max-width: 991.98px) {
   .sidebar {
-    width: 250px;
+    top: 10px;
+    bottom: 10px;
+    left: 10px;
+    width: min(340px, calc(100vw - 20px));
+    opacity: 0;
+    visibility: hidden;
+    transform: translateX(calc(-100% - 40px)) scale(0.98);
+    transform-origin: left center;
+    transition: transform 0.45s var(--ease-out), opacity 0.3s ease, visibility 0s linear 0.45s;
   }
 
-  .overlay {
+  .open {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(0) scale(1);
+    transition: transform 0.45s var(--ease-out), opacity 0.3s ease, visibility 0s;
+  }
+
+  .closeButton {
+    display: grid;
+  }
+
+  .backdrop {
     display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(30, 4, 12, 0.32);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+
+  .backdropVisible {
+    opacity: 1;
+    pointer-events: auto;
   }
 }
