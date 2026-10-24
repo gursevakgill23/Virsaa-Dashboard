@@ -74,7 +74,7 @@ const Login = () => {
       return;
     }
     if (!ENV.RECAPTCHA_SITE_KEY) {
-      setError('reCAPTCHA is not configured. Set REACT_APP_RECAPTCHA_PUBLIC_KEY in .env and restart.');
+      setError('reCAPTCHA is not configured. Set REACT_APP_RECAPTCHA_PUBLIC_KEY and rebuild.');
       return;
     }
     const captcha = recaptchaRef.current?.getValue();
@@ -246,7 +246,7 @@ const Login = () => {
                   />
                 </div>
               ) : (
-                <small className={styles.warning}>Missing REACT_APP_RECAPTCHA_PUBLIC_KEY in .env</small>
+                <small className={styles.warning}>Missing REACT_APP_RECAPTCHA_PUBLIC_KEY</small>
               )}
             </div>
 

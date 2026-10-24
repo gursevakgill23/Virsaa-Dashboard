@@ -1,51 +1,99 @@
 /**
- * useContentList — fetches the list endpoint for a content type and exposes
- * { items, loading, error, reload, prepend }. Stale responses from a previous
- * content type are ignored (prevents list flicker when switching pages fast).
+ * useContentList — one dashboard section's list, a page at a time.
+ *
+ *   GET <endpoint>?page=1&page_size=25&search=…&<filters>
+ *   → { count, next, previous, results }
+ *
+ * Returns the loaded items plus helpers to load more, reload, and update the
+ * list after an item is saved (upsert) or deleted (remove) without refetching.
+ * Responses that arrive after the search/filters changed are ignored.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { api, getErrorMessage, toList } from '../api/client';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { api, getErrorMessage, toCount, toList } from '../api/client';
 
-const useContentList = (endpoint) => {
+export const PAGE_SIZE = 25;
+
+const useContentList = (endpoint, { search = '', filters = {} } = {}) => {
   const [items, setItems] = useState([]);
+  const [count, setCount] = useState(0);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
   const requestId = useRef(0);
 
-  const reload = useCallback(async () => {
-    if (!endpoint) return;
-    const id = ++requestId.current;
-    setLoading(true);
-    setError('');
-    try {
-      const { data } = await api.get(endpoint, { params: { ordering: '-id', page_size: 100 } });
-      if (id !== requestId.current) return; // a newer request has started
-      // Newest first, whether or not the API supports ?ordering=
-      const list = toList(data).slice().sort((a, b) => (Number(b?.id) || 0) - (Number(a?.id) || 0));
-      setItems(list);
-    } catch (err) {
-      if (id !== requestId.current) return;
-      setItems([]);
-      setError(
-        err?.response?.status === 404
-          ? 'This list endpoint does not exist on the backend yet. Uploads will work once the API route is added.'
-          : getErrorMessage(err, 'Could not load items.')
-      );
-    } finally {
-      if (id === requestId.current) setLoading(false);
-    }
-  }, [endpoint]);
+  // Only send filters that have a value
+  const params = useMemo(() => {
+    const clean = Object.fromEntries(Object.entries(filters).filter(([, v]) => v !== '' && v !== null && v !== undefined));
+    if (search.trim()) clean.search = search.trim();
+    return clean;
+  }, [filters, search]);
+  const paramsKey = JSON.stringify(params);
+
+  const fetchPage = useCallback(
+    async (pageNumber) => {
+      if (!endpoint) return;
+      const id = ++requestId.current;
+      if (pageNumber === 1) setLoading(true);
+      else setLoadingMore(true);
+      setError('');
+      try {
+        const { data } = await api.get(endpoint, {
+          params: { ...JSON.parse(paramsKey), page: pageNumber, page_size: PAGE_SIZE },
+        });
+        if (id !== requestId.current) return;
+        const results = toList(data);
+        setItems((prev) => (pageNumber === 1 ? results : [...prev, ...results]));
+        setCount(toCount(data));
+        setPage(pageNumber);
+      } catch (err) {
+        if (id !== requestId.current) return;
+        if (pageNumber === 1) setItems([]);
+        const status = err?.response?.status;
+        setError(
+          status === 404 && pageNumber === 1
+            ? 'This section isn’t on the server yet. Deploy the dashboard_api app and try again.'
+            : getErrorMessage(err, 'Could not load the list.')
+        );
+      } finally {
+        if (id === requestId.current) {
+          setLoading(false);
+          setLoadingMore(false);
+        }
+      }
+    },
+    [endpoint, paramsKey]
+  );
 
   useEffect(() => {
-    reload();
-  }, [reload]);
+    fetchPage(1);
+  }, [fetchPage]);
 
-  /** Adds a freshly created item to the top without refetching. */
-  const prepend = useCallback((item) => {
-    if (item && typeof item === 'object') setItems((prev) => [item, ...prev]);
+  const reload = useCallback(() => fetchPage(1), [fetchPage]);
+  const loadMore = useCallback(() => fetchPage(page + 1), [fetchPage, page]);
+
+  /** Put a saved item in the list (replace it, or add it at the top). */
+  const upsert = useCallback((item) => {
+    if (!item || item.id === undefined) return;
+    setItems((prev) => {
+      const at = prev.findIndex((x) => x.id === item.id);
+      if (at === -1) {
+        setCount((c) => c + 1);
+        return [item, ...prev];
+      }
+      const next = prev.slice();
+      next[at] = item;
+      return next;
+    });
   }, []);
 
-  return { items, loading, error, reload, prepend };
+  /** Take a deleted item out of the list. */
+  const remove = useCallback((id) => {
+    setItems((prev) => prev.filter((x) => x.id !== id));
+    setCount((c) => Math.max(0, c - 1));
+  }, []);
+
+  return { items, count, loading, loadingMore, error, hasMore: items.length < count, loadMore, reload, upsert, remove };
 };
 
 export default useContentList;

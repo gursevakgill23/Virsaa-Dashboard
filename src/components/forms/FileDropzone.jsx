@@ -1,9 +1,16 @@
 /**
- * FileDropzone — drag-and-drop (or click) file picker with validation,
- * image preview and file details. Styled like the web app's dropzone.
+ * FileDropzone — drag-and-drop (or click) file picker.
+ *
+ * value:
+ *   null            nothing chosen
+ *   File            a new file to upload (validated before it's accepted)
+ *   string (URL)    the file already stored (edit mode) — can be viewed,
+ *                   replaced, or removed when the field allows it
+ * initialValue: the stored URL, so "undo" after choosing a new file goes back to it
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { FaCloudUploadAlt, FaFileAlt, FaFileAudio, FaFilePdf, FaFileArchive, FaTimes } from 'react-icons/fa';
+import { FaCloudUploadAlt, FaFileAlt, FaFileAudio, FaFilePdf, FaFileVideo, FaTimes, FaExternalLinkAlt, FaExchangeAlt } from 'react-icons/fa';
+import { safeUrl } from '../../api/client';
 import { validateFile } from '../../utils/contentForm';
 import styles from './Form.module.css';
 
@@ -15,29 +22,27 @@ export const formatBytes = (bytes) => {
   return `${(bytes / 1024 ** i).toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 };
 
-const iconFor = (file) => {
-  if (!file) return FaFileAlt;
-  if (file.type === 'application/pdf') return FaFilePdf;
-  if (file.type.startsWith('audio/')) return FaFileAudio;
-  if (file.name.toLowerCase().endsWith('.zip')) return FaFileArchive;
-  return FaFileAlt;
-};
+const KIND_ICONS = { pdf: FaFilePdf, audio: FaFileAudio, video: FaFileVideo };
 
-const FileDropzone = ({ field, value, onChange, onError, disabled, invalid, describedBy }) => {
+const FileDropzone = ({ field, value, initialValue, onChange, onError, disabled, invalid, describedBy }) => {
   const inputRef = useRef(null);
   const [dragging, setDragging] = useState(false);
 
-  const isImage = value instanceof File && value.type.startsWith('image/');
+  const isNewFile = value instanceof File;
+  const storedUrl = typeof value === 'string' ? safeUrl(value) : '';
+  const isPicture = field.kind === 'picture';
 
-  // Create a preview URL for images and revoke it when no longer needed
-  // (prevents memory leaks from object URLs).
-  const previewUrl = useMemo(() => (isImage ? URL.createObjectURL(value) : ''), [isImage, value]);
+  // Preview for a newly chosen picture; the object URL is revoked when replaced
+  const previewUrl = useMemo(() => (isNewFile && value.type.startsWith('image/') ? URL.createObjectURL(value) : ''), [isNewFile, value]);
   useEffect(() => () => previewUrl && URL.revokeObjectURL(previewUrl), [previewUrl]);
 
-  // Clear the native input when the form resets the value to null.
+  // Clear the native input whenever the value is reset
   useEffect(() => {
-    if (!value && inputRef.current) inputRef.current.value = '';
-  }, [value]);
+    if (!isNewFile && inputRef.current) inputRef.current.value = '';
+  }, [isNewFile]);
+
+  const accept = [...(field.accept || []), ...(field.extensions || []).map((e) => `.${e}`)].join(',');
+  const Icon = KIND_ICONS[field.kind] || FaFileAlt;
 
   const handleFile = (file) => {
     if (!file) return;
@@ -50,43 +55,70 @@ const FileDropzone = ({ field, value, onChange, onError, disabled, invalid, desc
     onChange(file);
   };
 
-  const onDrop = (event) => {
-    event.preventDefault();
-    setDragging(false);
-    if (disabled) return;
-    handleFile(event.dataTransfer.files?.[0]);
-  };
+  const hiddenInput = (
+    <input
+      ref={inputRef}
+      id={`field-${field.name}`}
+      type="file"
+      accept={accept}
+      disabled={disabled}
+      aria-invalid={invalid || undefined}
+      aria-describedby={describedBy}
+      onChange={(e) => handleFile(e.target.files?.[0])}
+    />
+  );
 
-  const FileIcon = iconFor(value);
-  const acceptAttr = [...(field.accept || []), ...(field.extensions || []).map((e) => `.${e}`)].join(',');
-
-  if (value instanceof File) {
+  /* ---- a file is chosen or already stored ---- */
+  if (isNewFile || storedUrl) {
+    const thumb = isNewFile ? previewUrl : isPicture ? storedUrl : '';
     return (
       <div className={styles.fileCard}>
-        {isImage ? (
-          <img src={previewUrl} alt="Selected preview" className={styles.filePreview} />
+        {thumb ? (
+          <img src={thumb} alt="" className={styles.filePreview} referrerPolicy="no-referrer" />
         ) : (
           <span className={styles.fileIcon}>
-            <FileIcon aria-hidden="true" />
+            <Icon aria-hidden="true" />
           </span>
         )}
         <div className={styles.fileMeta}>
-          <strong title={value.name}>{value.name}</strong>
-          <small>{formatBytes(value.size)}</small>
+          {isNewFile ? (
+            <>
+              <strong title={value.name}>{value.name}</strong>
+              <small>{formatBytes(value.size)} · will be uploaded when you save</small>
+            </>
+          ) : (
+            <>
+              <strong>Current {isPicture ? 'picture' : 'file'}</strong>
+              <a href={storedUrl} target="_blank" rel="noopener noreferrer" className={styles.fileLink}>
+                Open <FaExternalLinkAlt aria-hidden="true" />
+              </a>
+            </>
+          )}
         </div>
-        <button
-          type="button"
-          className={styles.fileRemove}
-          onClick={() => onChange(null)}
-          disabled={disabled}
-          aria-label={`Remove ${value.name}`}
-        >
-          <FaTimes />
-        </button>
+        <div className={styles.fileActions}>
+          <label className={styles.fileAction} title="Replace">
+            <FaExchangeAlt aria-hidden="true" />
+            <span className="sr-only">Replace {field.label}</span>
+            {hiddenInput}
+          </label>
+          {(isNewFile || field.removable !== false) && (
+            <button
+              type="button"
+              className={styles.fileAction}
+              onClick={() => onChange(isNewFile && typeof initialValue === 'string' ? initialValue : null)}
+              disabled={disabled}
+              title={isNewFile ? 'Undo' : 'Remove'}
+              aria-label={isNewFile ? `Undo new ${field.label}` : `Remove ${field.label}`}
+            >
+              <FaTimes />
+            </button>
+          )}
+        </div>
       </div>
     );
   }
 
+  /* ---- nothing chosen ---- */
   return (
     <label
       className={`${styles.dropzone} ${dragging ? styles.dropzoneActive : ''} ${invalid ? styles.dropzoneInvalid : ''}`}
@@ -95,23 +127,18 @@ const FileDropzone = ({ field, value, onChange, onError, disabled, invalid, desc
         if (!disabled) setDragging(true);
       }}
       onDragLeave={() => setDragging(false)}
-      onDrop={onDrop}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDragging(false);
+        if (!disabled) handleFile(e.dataTransfer.files?.[0]);
+      }}
     >
       <FaCloudUploadAlt aria-hidden="true" />
       <span>
         <strong>Click to choose</strong> or drag a file here
       </span>
       {field.hint && <small>{field.hint}</small>}
-      <input
-        ref={inputRef}
-        id={`field-${field.name}`}
-        type="file"
-        accept={acceptAttr}
-        disabled={disabled}
-        aria-invalid={invalid || undefined}
-        aria-describedby={describedBy}
-        onChange={(e) => handleFile(e.target.files?.[0])}
-      />
+      {hiddenInput}
     </label>
   );
 };

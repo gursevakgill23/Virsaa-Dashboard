@@ -31,7 +31,8 @@ export const ENV = Object.freeze({
   /**
    * Google reCAPTCHA v2 *site* (public) key — the same one Virsaa-Web uses.
    * The login endpoint verifies the captcha token, exactly like the web app.
-   * Add "localhost" and the dashboard's domain in the reCAPTCHA admin console.
+   * Every domain the dashboard runs on (localhost, the Vercel URL) must be
+   * listed for this key in the reCAPTCHA admin console.
    */
   RECAPTCHA_SITE_KEY: (process.env.REACT_APP_RECAPTCHA_PUBLIC_KEY || '').trim(),
 
@@ -42,7 +43,7 @@ export const ENV = Object.freeze({
   UPLOAD_TIMEOUT_MS: toPositiveInt(process.env.REACT_APP_UPLOAD_TIMEOUT_MS, 600000),
 
   /** Hard ceiling for any single uploaded file, in MB. */
-  MAX_UPLOAD_MB: toPositiveInt(process.env.REACT_APP_MAX_UPLOAD_MB, 500),
+  MAX_UPLOAD_MB: toPositiveInt(process.env.REACT_APP_MAX_UPLOAD_MB, 300),
 
   /** Minutes of inactivity before an admin is signed out automatically. */
   IDLE_TIMEOUT_MINUTES: toPositiveInt(process.env.REACT_APP_IDLE_TIMEOUT_MINUTES, 30),

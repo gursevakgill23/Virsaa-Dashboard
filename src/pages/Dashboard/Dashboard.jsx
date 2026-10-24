@@ -1,12 +1,12 @@
 /**
- * Dashboard — live overview built from real API data (no more placeholder
- * numbers). Every request runs in parallel with Promise.allSettled, so one
- * missing endpoint never breaks the rest of the page.
+ * Dashboard — overview from GET /api/dashboard/ (how many of everything,
+ * how many are hidden, what is waiting for a look) plus member counts from
+ * /api/auth/users/. Requests run in parallel; one failing never blanks the page.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FaUsers, FaCrown, FaBook, FaHeadphones, FaArrowRight, FaSyncAlt, FaPlus } from 'react-icons/fa';
-import { api, toCount, toList } from '../../api/client';
+import { FaUsers, FaCrown, FaBook, FaHeadphones, FaArrowRight, FaSyncAlt, FaPlus, FaClock, FaInbox } from 'react-icons/fa';
+import { api, getErrorMessage, toCount, toList } from '../../api/client';
 import { CONTENT_TYPES } from '../../config/contentTypes';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
@@ -14,7 +14,6 @@ import Avatar from '../../components/ui/Avatar';
 import pageStyles from '../../styles/Page.module.css';
 import styles from './Dashboard.module.css';
 
-/** Greeting based on the admin's local time. */
 const greeting = () => {
   const hour = new Date().getHours();
   if (hour < 12) return 'Good morning';
@@ -24,36 +23,61 @@ const greeting = () => {
 
 const formatNumber = (value) => (typeof value === 'number' ? value.toLocaleString() : '—');
 
+/** Total items for a section from the summary (arcade and calendar are shaped differently). */
+const totalFor = (type, summary) => {
+  const entry = summary?.[type.summaryKey];
+  if (!entry) return null;
+  if (type.key === 'arcade') return Object.values(entry).reduce((sum, game) => sum + (game?.items || 0), 0);
+  if (type.key === 'gurpurabs') return entry.this_year ?? null;
+  return typeof entry.total === 'number' ? entry.total : null;
+};
+
+/** A short note under the count: hidden / waiting / this year… */
+const noteFor = (type, summary) => {
+  const entry = summary?.[type.summaryKey];
+  if (!entry) return '';
+  if (type.key === 'gurpurabs') return `this year · ${entry.custom ?? 0} added here`;
+  if (type.key === 'events') return [entry.upcoming != null && `${entry.upcoming} upcoming`, entry.hidden && `${entry.hidden} waiting`].filter(Boolean).join(' · ');
+  if (type.key === 'arcade') {
+    const builtin = Object.values(entry).filter((g) => g?.uses_builtin).length;
+    return builtin ? `${builtin} games on built-in content` : '';
+  }
+  return entry.hidden ? `${entry.hidden} hidden` : '';
+};
+
 const Dashboard = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({ users: null, premium: null, basic: null, content: {} });
-  const [recentUsers, setRecentUsers] = useState([]);
+  const [summary, setSummary] = useState(null);
+  const [summaryError, setSummaryError] = useState('');
+  const [members, setMembers] = useState({ all: null, premium: null, basic: null, newest: [] });
 
   const load = useCallback(async () => {
     setLoading(true);
+    setSummaryError('');
+    const [overview, all, premium, basic] = await Promise.allSettled([
+      api.get('/api/dashboard/'),
+      api.get('/api/auth/users/all/'),
+      api.get('/api/auth/users/premium/'),
+      api.get('/api/auth/users/basic/'),
+    ]);
 
-    const userRequests = ['all', 'premium', 'basic'].map((filter) => api.get(`/api/auth/users/${filter}/`));
-    const contentRequests = CONTENT_TYPES.map((type) => api.get(type.endpoints.list, { params: { page_size: 1 } }));
+    if (overview.status === 'fulfilled') setSummary(overview.value.data || {});
+    else setSummaryError(getErrorMessage(overview.reason, 'Could not load the overview.'));
 
-    const [allUsers, premium, basic, ...contentResults] = await Promise.allSettled([...userRequests, ...contentRequests]);
-
-    const countOf = (result) => (result.status === 'fulfilled' ? toCount(result.value.data) : null);
-
-    const content = {};
-    CONTENT_TYPES.forEach((type, index) => {
-      content[type.key] = countOf(contentResults[index]);
+    const countOf = (r) => (r.status === 'fulfilled' ? toCount(r.value.data) : null);
+    setMembers({
+      all: countOf(all),
+      premium: countOf(premium),
+      basic: countOf(basic),
+      newest:
+        all.status === 'fulfilled'
+          ? toList(all.value.data)
+              .slice()
+              .sort((a, b) => new Date(b?.joined_date || 0) - new Date(a?.joined_date || 0))
+              .slice(0, 6)
+          : [],
     });
-
-    setStats({ users: countOf(allUsers), premium: countOf(premium), basic: countOf(basic), content });
-
-    if (allUsers.status === 'fulfilled') {
-      const list = toList(allUsers.value.data)
-        .slice()
-        .sort((a, b) => new Date(b?.joined_date || 0) - new Date(a?.joined_date || 0))
-        .slice(0, 6);
-      setRecentUsers(list);
-    }
     setLoading(false);
   }, []);
 
@@ -61,24 +85,23 @@ const Dashboard = () => {
     load();
   }, [load]);
 
-  const premiumShare =
-    stats.users && typeof stats.premium === 'number' ? Math.round((stats.premium / stats.users) * 100) : null;
+  const premiumShare = members.all && typeof members.premium === 'number' ? Math.round((members.premium / members.all) * 100) : null;
 
-  /** Content types sorted by size for the library breakdown bars. */
   const breakdown = useMemo(() => {
-    const rows = CONTENT_TYPES.map((type) => ({ type, count: stats.content[type.key] }));
+    const rows = CONTENT_TYPES.map((type) => ({ type, count: totalFor(type, summary), note: noteFor(type, summary) }));
     const max = Math.max(1, ...rows.map((r) => r.count || 0));
     return rows.map((r) => ({ ...r, percent: r.count ? Math.max(4, (r.count / max) * 100) : 0 }));
-  }, [stats.content]);
+  }, [summary]);
 
-  const totalContent = breakdown.reduce((sum, row) => sum + (row.count || 0), 0);
+  const waitingEvents = summary?.waiting?.events ?? 0;
+  const waitingBooks = summary?.waiting?.shared_books;
   const firstName = user?.first_name || user?.username || 'Admin';
 
   const tiles = [
-    { label: 'Members', value: stats.users, icon: FaUsers, to: '/users/all' },
-    { label: 'Premium members', value: stats.premium, icon: FaCrown, to: '/users/premium', note: premiumShare !== null ? `${premiumShare}% of members` : '' },
-    { label: 'Ebooks', value: stats.content.ebooks, icon: FaBook, to: '/uploads/ebooks' },
-    { label: 'Audiobooks', value: stats.content.audiobooks, icon: FaHeadphones, to: '/uploads/audiobooks' },
+    { label: 'Members', value: members.all, icon: FaUsers, to: '/users/all' },
+    { label: 'Premium members', value: members.premium, icon: FaCrown, to: '/users/premium', note: premiumShare !== null ? `${premiumShare}% of members` : '' },
+    { label: 'Ebooks', value: summary?.ebooks?.total, icon: FaBook, to: '/uploads/ebooks' },
+    { label: 'Audiobooks', value: summary?.audiobooks?.total, icon: FaHeadphones, to: '/uploads/audiobooks', note: summary?.audiobooks?.hidden ? `${summary.audiobooks.hidden} hidden` : '' },
   ];
 
   return (
@@ -94,6 +117,34 @@ const Dashboard = () => {
         }
       />
 
+      {summaryError && (
+        <div className={pageStyles.errorBox} role="alert" style={{ marginBottom: 20 }}>
+          {summaryError}
+        </div>
+      )}
+
+      {/* ---------- Waiting for a look ---------- */}
+      {!loading && (waitingEvents > 0 || waitingBooks > 0) && (
+        <section className={`${styles.waiting} ${pageStyles.fadeIn}`} aria-label="Waiting for review">
+          <span className={styles.waitingIcon}>
+            <FaInbox aria-hidden="true" />
+          </span>
+          <div className={styles.waitingText}>
+            <strong>Waiting for you</strong>
+            <span>
+              {[waitingEvents > 0 && `${waitingEvents} event${waitingEvents === 1 ? '' : 's'} to approve`, waitingBooks > 0 && `${waitingBooks} shared book${waitingBooks === 1 ? '' : 's'} to review`]
+                .filter(Boolean)
+                .join(' · ')}
+            </span>
+          </div>
+          {waitingEvents > 0 && (
+            <Link to="/uploads/events?is_approved=false" className={`${pageStyles.button} ${pageStyles.buttonSmall}`}>
+              <FaClock aria-hidden="true" /> Review events
+            </Link>
+          )}
+        </section>
+      )}
+
       {/* ---------- Stat tiles ---------- */}
       <div className={styles.tiles}>
         {tiles.map(({ label, value, icon: Icon, to, note }, index) => (
@@ -102,29 +153,25 @@ const Dashboard = () => {
               <Icon aria-hidden="true" />
             </span>
             <span className={styles.tileLabel}>{label}</span>
-            {loading ? (
-              <span className={`${pageStyles.skeleton} ${styles.tileSkeleton}`} />
-            ) : (
-              <span className={styles.tileValue}>{formatNumber(value)}</span>
-            )}
+            {loading ? <span className={`${pageStyles.skeleton} ${styles.tileSkeleton}`} /> : <span className={styles.tileValue}>{formatNumber(value)}</span>}
             {note && !loading && <span className={styles.tileNote}>{note}</span>}
           </Link>
         ))}
       </div>
 
       <div className={styles.columns}>
-        {/* ---------- Library breakdown ---------- */}
+        {/* ---------- Every section ---------- */}
         <section className={`${pageStyles.card} ${pageStyles.fadeIn}`} aria-labelledby="library-heading">
           <div className={pageStyles.cardHeader}>
             <div>
               <h2 id="library-heading" className={pageStyles.cardTitle}>
-                Content library
+                Content
               </h2>
-              <p className={pageStyles.cardMeta}>{loading ? 'Counting…' : `${totalContent.toLocaleString()} items across ${CONTENT_TYPES.length} collections`}</p>
+              <p className={pageStyles.cardMeta}>Everything on the website, including hidden items</p>
             </div>
           </div>
           <ul className={styles.bars}>
-            {breakdown.map(({ type, count, percent }) => {
+            {breakdown.map(({ type, count, note, percent }) => {
               const Icon = type.icon;
               return (
                 <li key={type.key}>
@@ -132,17 +179,19 @@ const Dashboard = () => {
                     <span className={styles.barIcon}>
                       <Icon aria-hidden="true" />
                     </span>
-                    <span className={styles.barLabel}>{type.label}</span>
+                    <span className={styles.barLabel}>
+                      {type.label}
+                      {note && !loading && <small>{note}</small>}
+                    </span>
                     <span className={styles.barTrack} aria-hidden="true">
                       <span className={styles.barFill} style={{ width: loading ? '0%' : `${percent}%` }} />
                     </span>
-                    <span className={styles.barValue}>{loading ? '…' : count === null ? 'n/a' : count.toLocaleString()}</span>
+                    <span className={styles.barValue}>{loading ? '…' : formatNumber(count)}</span>
                   </Link>
                 </li>
               );
             })}
           </ul>
-          <p className={styles.footnote}>“n/a” means the list endpoint isn’t available on the backend yet.</p>
         </section>
 
         <div className={styles.sideColumn}>
@@ -152,12 +201,7 @@ const Dashboard = () => {
               Membership plans
             </h2>
             <div className={styles.donutWrap}>
-              <div
-                className={styles.donut}
-                style={{ '--premium': `${premiumShare ?? 0}%` }}
-                role="img"
-                aria-label={premiumShare !== null ? `${premiumShare}% of members are Premium` : 'Membership data unavailable'}
-              >
+              <div className={styles.donut} style={{ '--premium': `${premiumShare ?? 0}%` }} role="img" aria-label={premiumShare !== null ? `${premiumShare}% of members are Premium` : 'Membership data unavailable'}>
                 <span>
                   <strong>{premiumShare !== null ? `${premiumShare}%` : '—'}</strong>
                   <small>Premium</small>
@@ -165,10 +209,10 @@ const Dashboard = () => {
               </div>
               <ul className={styles.legend}>
                 <li>
-                  <span className={`${styles.dot} ${styles.dotPremium}`} /> Premium <strong>{formatNumber(stats.premium)}</strong>
+                  <span className={`${styles.dot} ${styles.dotPremium}`} /> Premium <strong>{formatNumber(members.premium)}</strong>
                 </li>
                 <li>
-                  <span className={`${styles.dot} ${styles.dotBasic}`} /> Basic <strong>{formatNumber(stats.basic)}</strong>
+                  <span className={`${styles.dot} ${styles.dotBasic}`} /> Basic <strong>{formatNumber(members.basic)}</strong>
                 </li>
               </ul>
             </div>
@@ -184,18 +228,18 @@ const Dashboard = () => {
                 See all <FaArrowRight aria-hidden="true" />
               </Link>
             </div>
-            {!loading && recentUsers.length === 0 && <p className={pageStyles.empty}>No members to show.</p>}
+            {!loading && members.newest.length === 0 && <p className={pageStyles.empty}>No members to show.</p>}
             <ul className={styles.members}>
-              {recentUsers.map((member) => {
-                const name = [member.first_name, member.last_name].filter(Boolean).join(' ') || member.username || 'Member';
+              {members.newest.map((m) => {
+                const name = [m.first_name, m.last_name].filter(Boolean).join(' ') || m.username || 'Member';
                 return (
-                  <li key={member.id ?? member.email} className={styles.member}>
-                    <Avatar src={member.profile_photo} name={name} size={38} />
+                  <li key={m.id ?? m.email} className={styles.member}>
+                    <Avatar src={m.profile_photo} name={name} size={38} />
                     <span className={styles.memberText}>
                       <strong>{name}</strong>
-                      <small>{member.joined_date ? new Date(member.joined_date).toLocaleDateString() : member.email}</small>
+                      <small>{m.joined_date ? new Date(m.joined_date).toLocaleDateString() : m.email}</small>
                     </span>
-                    {String(member.membership_level || '').toLowerCase().includes('premium') && (
+                    {/premium/i.test(String(m.membership_level || '')) && (
                       <span className={`${pageStyles.pill} ${pageStyles.pillGold}`}>
                         <FaCrown aria-hidden="true" />
                       </span>
@@ -208,10 +252,10 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* ---------- Quick upload ---------- */}
+      {/* ---------- Quick add ---------- */}
       <section className={`${styles.quick} ${pageStyles.fadeIn}`} aria-labelledby="quick-heading">
         <h2 id="quick-heading" className={styles.quickTitle}>
-          Quick upload
+          Quick add
         </h2>
         <div className={styles.quickGrid}>
           {CONTENT_TYPES.map((type) => {

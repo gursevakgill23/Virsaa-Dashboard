@@ -544,3 +544,291 @@ select.input {
     flex: 1 1 auto;
   }
 }
+
+/* =============================================================================
+ * v3 additions — edit mode, stored files, list editor, chips, arcade, JSON
+ * ========================================================================== */
+
+/* Edit mode: a gold edge so it's obvious an existing item is open */
+.editing {
+  box-shadow: inset 4px 0 0 var(--gold), var(--glass-highlight), var(--shadow-soft);
+}
+
+.lockedNote {
+  margin-left: 8px;
+  color: var(--secondary-text-color);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.86rem;
+}
+
+/* ---------------- Stored / chosen file ---------------- */
+.fileLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.fileLink svg {
+  font-size: 0.7rem;
+}
+
+.fileActions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.fileAction {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(var(--primary-rgb), 0.08);
+  color: var(--primary-color);
+  cursor: pointer;
+}
+
+.fileAction:hover {
+  background: rgba(var(--primary-rgb), 0.16);
+}
+
+.fileAction input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.fileAction:focus-within {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+/* ---------------- List editor (chapters, sections, sources) ---------------- */
+.listEditor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.listEmpty {
+  padding: 12px 14px;
+  border: 1.5px dashed rgba(var(--primary-rgb), 0.25);
+  border-radius: 14px;
+  color: var(--secondary-text-color);
+  font-size: 0.88rem;
+}
+
+.listRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  background: var(--card-bg-color);
+}
+
+.listIndex {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  margin-top: 8px;
+  border-radius: 50%;
+  background: rgba(var(--primary-rgb), 0.1);
+  color: var(--primary-color);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.listFields {
+  display: flex;
+  flex-wrap: wrap;
+  flex: 1;
+  gap: 8px;
+  min-width: 0;
+}
+
+.listFieldsStacked {
+  flex-direction: column;
+}
+
+.listCell {
+  flex: 1 1 120px;
+  min-width: 0;
+}
+
+.listCellWide {
+  flex-basis: 100%;
+}
+
+.listCheck {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.listCheck input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--maroon);
+}
+
+.listTools {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.listTools button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--secondary-text-color);
+  cursor: pointer;
+}
+
+.listTools button:hover:not(:disabled) {
+  background: rgba(var(--primary-rgb), 0.1);
+  color: var(--primary-color);
+}
+
+.listTools button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.addRow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  border: 1.5px dashed rgba(var(--primary-rgb), 0.4);
+  border-radius: 14px;
+  background: transparent;
+  color: var(--primary-color);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.addRow:hover:not(:disabled) {
+  background: rgba(var(--primary-rgb), 0.05);
+}
+
+/* ---------------- Multi-select chips ---------------- */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  padding: 6px 12px;
+  border: 1px solid var(--input-border-color);
+  border-radius: var(--radius-pill);
+  background: var(--input-bg-color);
+  color: var(--text-color);
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chipOn {
+  border-color: transparent;
+  background: linear-gradient(150deg, var(--maroon-bright), var(--maroon));
+  color: #fff;
+}
+
+[data-theme='dark'] .chipOn {
+  background: #f2b3c2;
+  color: #2b0f16;
+}
+
+/* ---------------- Arcade data ---------------- */
+.subgrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 16px;
+  padding: 16px;
+  border: 1px solid var(--border-color);
+  border-left: 4px solid var(--gold);
+  border-radius: 18px;
+  background: var(--card-bg-color);
+}
+
+.clues {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+/* ---------------- Quiz extras ---------------- */
+.questionMeta {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 10px;
+  align-items: start;
+}
+
+.questionPoints {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--secondary-text-color);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+/* ---------------- Duplicate event warning ---------------- */
+.duplicateBox {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid rgba(201, 162, 74, 0.6);
+  border-radius: 16px;
+  background: var(--warning-soft);
+  color: var(--text-color);
+}
+
+.duplicateBox > svg {
+  margin-top: 3px;
+  color: var(--warning);
+}
+
+.duplicateActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+@media (max-width: 720px) {
+  .subgrid,
+  .clues,
+  .questionMeta {
+    grid-template-columns: 1fr;
+  }
+}

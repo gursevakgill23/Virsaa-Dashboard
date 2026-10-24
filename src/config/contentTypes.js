@@ -1,32 +1,35 @@
 /**
  * =============================================================================
- * CONTENT TYPES — one schema per upload page.
+ * CONTENT TYPES — one entry per dashboard page, matching /api/dashboard/.
  * =============================================================================
- * Every upload page in the dashboard is generated from this file. To add a
- * new content type, add one entry to CONTENT_TYPES — the route, sidebar link,
- * form, validation, JSON import and "recent uploads" list appear automatically.
+ * Every content page (route, sidebar link, list, filters, add/edit form,
+ * delete, JSON import) is generated from this file. Field `name`s are sent to
+ * Django exactly as written and match dashboard_api/serializers.py.
  *
- * Field names below are sent to Django exactly as written, so they must match
- * your serializer fields. Ebooks, Audiobooks and Authors use the field names
- * from the existing dashboard (already working against the backend). The other
- * types follow the same conventions — check them against your models and edit
- * `name:` values here if anything differs. DRF ignores unknown fields on
- * create, so an extra field here will never break an upload.
+ * Content type keys:
+ *   endpoint      list + create URL; `${endpoint}${id}/` reads/edits/deletes one
+ *   summaryKey    key in GET /api/dashboard/ for the overview counts
+ *   row(item)     what the list shows: { title, subtitle, image }
+ *   filters       drop-downs above the list → ?name=value
+ *   refreshChoices  re-load /choices/ after saving (authors, topics…)
+ *   jsonImport    false to hide the JSON tab
  *
- * Field definition reference:
- *   name        — key sent to the API (required)
- *   label       — text shown above the input
- *   type        — text | textarea | number | select | date | url | file |
- *                 checkbox | author | tags | questions | gurmukhi
- *   required    — must be filled in
- *   options     — for `select`: array of strings or { value, label }
- *   accept      — for `file`: allowed MIME types
- *   extensions  — for `file`: allowed extensions (checked as well as MIME)
- *   maxMB       — for `file`: maximum size in megabytes
- *   min / max / step / maxLength / pattern / patternMessage — validation
- *   showWhen    — { field, in: [...] } only show when another field matches
- *   span        — 'full' to make the field take the whole row
- *   hint        — small helper text under the input
+ * Field keys:
+ *   name, label, type, hint, placeholder, span ('full')
+ *   type          text | textarea | gurmukhi | number | select | multiselect |
+ *                 checkbox | date | time | datetime | url | file | list |
+ *                 questions | json | arcadeData
+ *   required          needed on create and edit
+ *   requiredOnCreate  needed when adding only (e.g. files that can't be removed)
+ *   optionsFrom   key of GET /api/dashboard/choices/ (e.g. 'authors')
+ *   options       fallback options when /choices/ hasn't loaded
+ *   numeric       select value is an id → sent as a number
+ *   kind          for files: picture | pdf | audio | video (see FILE_KINDS)
+ *   removable     false = a file can be replaced but not removed
+ *   showWhen      { field, in: [...] } — only shown when another field matches
+ *   lockOnEdit    can't be changed after creation
+ *   itemFields    for `list`: the columns of each row
+ *   sendToApi     false = UI-only helper field
  * ========================================================================== */
 import {
   FaBook,
@@ -39,96 +42,114 @@ import {
   FaLandmark,
   FaCalendarAlt,
   FaFeatherAlt,
+  FaTags,
+  FaFont,
+  FaPuzzlePiece,
+  FaCalendarCheck,
+  FaNewspaper,
 } from 'react-icons/fa';
+import { ARCADE_GAMES, ARCADE_GROUPS } from './arcade';
+
+const API = '/api/dashboard';
+
+/** 'easy:Easy|medium:Medium' → [{ value, label }] — compact fallback lists. */
+const opts = (spec) =>
+  spec.split('|').map((pair) => {
+    const [value, label] = pair.split(':');
+    return { value, label: label || value };
+  });
 
 /* ---------------------------------------------------------------------------
- * Shared option lists
+ * Files — limits match dashboard_api/files.py
  * ------------------------------------------------------------------------- */
-export const LANGUAGES = ['English', 'Punjabi', 'Hindi', 'Bilingual (English / Punjabi)'];
-
-/** Ontario grade levels — matches the Khalsa school syllabus structure. */
-export const GRADE_LEVELS = [
-  'JK',
-  'SK',
-  ...Array.from({ length: 12 }, (_, i) => `Grade ${i + 1}`),
-  'All Ages',
-];
-
-export const AGE_GROUPS = ['3-5', '6-8', '9-12', '13-17', 'Adults', 'All Ages'];
-
-export const GURUS = [
-  'Guru Nanak Dev Ji',
-  'Guru Angad Dev Ji',
-  'Guru Amar Das Ji',
-  'Guru Ram Das Ji',
-  'Guru Arjan Dev Ji',
-  'Guru Hargobind Sahib Ji',
-  'Guru Har Rai Ji',
-  'Guru Har Krishan Ji',
-  'Guru Tegh Bahadur Ji',
-  'Guru Gobind Singh Ji',
-  'Guru Granth Sahib Ji',
-  'Other / General',
-];
-
-/* ---------------------------------------------------------------------------
- * Reusable field builders (keeps the schemas short and consistent)
- * ------------------------------------------------------------------------- */
-const IMAGE_MIME = ['image/png', 'image/jpeg', 'image/webp'];
-const IMAGE_EXT = ['png', 'jpg', 'jpeg', 'webp'];
-
-const imageField = (name, label, extra = {}) => ({
-  name,
-  label,
-  type: 'file',
-  accept: IMAGE_MIME,
-  extensions: IMAGE_EXT,
-  maxMB: 5,
-  hint: 'PNG, JPG or WebP · up to 5 MB',
-  ...extra,
-});
-
-const audioField = (name, label, extra = {}) => ({
-  name,
-  label,
-  type: 'file',
-  accept: ['audio/mpeg', 'audio/mp3', 'audio/mp4', 'audio/x-m4a', 'audio/aac', 'audio/wav', 'audio/x-wav'],
-  extensions: ['mp3', 'm4a', 'aac', 'wav'],
-  maxMB: 300,
-  hint: 'MP3, M4A, AAC or WAV · up to 300 MB',
-  ...extra,
-});
-
-const pdfField = (name, label, extra = {}) => ({
-  name,
-  label,
-  type: 'file',
-  accept: ['application/pdf'],
-  extensions: ['pdf'],
-  maxMB: 100,
-  hint: 'PDF · up to 100 MB',
-  ...extra,
-});
-
-const ratingField = { name: 'rating', label: 'Rating (0 – 5)', type: 'number', min: 0, max: 5, step: 0.1, defaultValue: 0 };
-const premiumField = {
-  name: 'is_premium',
-  label: 'Premium only',
-  type: 'checkbox',
-  hint: 'Only members on the Premium plan can open this.',
-  defaultValue: false,
+export const FILE_KINDS = {
+  picture: {
+    accept: ['image/jpeg', 'image/png', 'image/webp'],
+    extensions: ['jpg', 'jpeg', 'png', 'webp'],
+    maxMB: 15,
+    hint: 'JPG, PNG or WebP · up to 15 MB',
+  },
+  pdf: {
+    accept: ['application/pdf'],
+    extensions: ['pdf'],
+    maxMB: 250,
+    hint: 'PDF without a password · up to 250 MB',
+  },
+  audio: {
+    accept: ['audio/mpeg', 'audio/mp3', 'audio/mp4', 'audio/x-m4a', 'audio/m4a', 'audio/aac'],
+    extensions: ['mp3', 'm4a'],
+    maxMB: 280,
+    hint: 'MP3 or M4A · up to 280 MB · its length is measured for you',
+  },
+  video: {
+    accept: ['video/mp4', 'video/quicktime', 'video/webm'],
+    extensions: ['mp4', 'mov', 'webm'],
+    maxMB: 280,
+    hint: 'MP4, MOV or WebM · up to 280 MB',
+  },
 };
-const descriptionField = { name: 'description', label: 'Description', type: 'textarea', maxLength: 5000, span: 'full' };
-const languageField = { name: 'language', label: 'Language', type: 'select', options: LANGUAGES, defaultValue: 'English' };
 
-/** Accepts "H:MM:SS" or "HH:MM:SS" (the format Django's DurationField expects). */
-const DURATION_PATTERN = /^\d{1,3}:[0-5]\d:[0-5]\d$/;
+const file = (name, label, kind, extra = {}) => ({ name, label, type: 'file', kind, ...FILE_KINDS[kind], ...extra });
 
 /* ---------------------------------------------------------------------------
- * Content type schemas
+ * Shared fields and filters
+ * ------------------------------------------------------------------------- */
+const DIFFICULTIES = opts('easy:Easy|medium:Medium|hard:Hard');
+const YOUTUBE_ID = /^[A-Za-z0-9_-]{11}$/;
+const DURATION = /^(\d{1,3}:)?[0-5]?\d:[0-5]\d$/;
+
+const published = { name: 'is_published', label: 'Published on the website', type: 'checkbox', defaultValue: true };
+const order = { name: 'order', label: 'Order', type: 'number', min: 0, step: 1, hint: 'Lower numbers come first.' };
+const rating = { name: 'rating', label: 'Rating (0 – 5)', type: 'number', min: 0, max: 5, step: 0.1 };
+const slug = {
+  name: 'slug',
+  label: 'Web address (slug)',
+  type: 'text',
+  maxLength: 120,
+  pattern: /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+  patternMessage: 'Use lower-case letters, numbers and dashes only.',
+  hint: 'Made from the title when left empty.',
+};
+const youtubeId = (name = 'youtube_id', label = 'YouTube video id') => ({
+  name,
+  label,
+  type: 'text',
+  pattern: YOUTUBE_ID,
+  patternMessage: 'The 11 characters after "v=" in the YouTube link.',
+  placeholder: 'dQw4w9WgXcQ',
+});
+
+const F_PUBLISHED = { name: 'is_published', label: 'Status', options: opts('true:Published|false:Hidden') };
+const F_ACTIVE = { name: 'is_active', label: 'Status', options: opts('true:Active|false:Inactive') };
+
+/** Lessons, quizzes and games share these (LearningItemSerializer.COMMON). */
+const learningCommon = [
+  { name: 'title', label: 'Title', type: 'text', required: true, maxLength: 200 },
+  { name: 'category', label: 'Topic', type: 'select', required: true, optionsFrom: 'categories', numeric: true, hint: 'Add topics on the Topics page.' },
+  { name: 'description', label: 'Short description', type: 'textarea', required: true, rows: 3, span: 'full' },
+  { name: 'difficulty', label: 'Difficulty', type: 'select', optionsFrom: 'difficulties', options: DIFFICULTIES, defaultValue: 'easy' },
+  slug,
+  order,
+  { name: 'xp_reward', label: 'XP reward', type: 'number', min: 0, step: 1 },
+  { name: 'coin_reward', label: 'Coin reward', type: 'number', min: 0, step: 1 },
+  file('image_file', 'Picture', 'picture'),
+  { name: 'image', label: '…or picture link', type: 'url', hint: 'Used when no picture is uploaded.' },
+  published,
+  { name: 'is_restricted', label: 'Sign-in needed', type: 'checkbox', defaultValue: false },
+  { name: 'is_premium', label: 'Premium only', type: 'checkbox', defaultValue: false },
+];
+const learningFilters = [
+  { name: 'category', label: 'Topic', optionsFrom: 'categories' },
+  { name: 'difficulty', label: 'Difficulty', optionsFrom: 'difficulties', options: DIFFICULTIES },
+  F_PUBLISHED,
+];
+const learningRow = (item) => ({ title: item.title, subtitle: item.category_name, image: item.picture });
+
+/* ---------------------------------------------------------------------------
+ * The content types
  * ------------------------------------------------------------------------- */
 export const CONTENT_TYPES = [
-  /* ============================== EBOOKS ============================== */
+  /* ============================== LIBRARY ============================== */
   {
     key: 'ebooks',
     slug: 'ebooks',
@@ -136,24 +157,29 @@ export const CONTENT_TYPES = [
     label: 'Ebooks',
     singular: 'Ebook',
     icon: FaBook,
-    description: 'PDF books for the Virsaa library — Sikh literature, history and teaching texts.',
-    endpoints: { list: '/collections/ebooks/', create: '/collections/ebooks/admin_create/' },
-    submitAs: 'multipart',
-    display: { title: 'title', subtitle: 'author_name', image: 'cover_image' },
+    description: 'PDF books for the library. Pages are counted from the PDF.',
+    endpoint: `${API}/ebooks/`,
+    summaryKey: 'ebooks',
+    row: (item) => ({ title: item.title, subtitle: item.author_name || 'No author', image: item.cover_image }),
+    filters: [{ name: 'author', label: 'Author', optionsFrom: 'authors' }],
     fields: [
       { name: 'title', label: 'Title', type: 'text', required: true, maxLength: 255 },
-      { name: 'author', label: 'Author', type: 'author', required: true, hint: 'Add the author first on the Authors page if missing.' },
-      imageField('cover_image', 'Cover image', { required: true }),
-      pdfField('pdf_file', 'Book PDF', { required: true }),
-      { name: 'pages', label: 'Pages', type: 'number', required: true, min: 1, max: 20000, step: 1 },
-      ratingField,
-      languageField,
-      premiumField,
-      descriptionField,
+      { name: 'author', label: 'Author', type: 'select', optionsFrom: 'authors', numeric: true, hint: 'Missing? Add them on the Authors page.' },
+      file('cover_image', 'Cover', 'picture', { requiredOnCreate: true, removable: false }),
+      file('pdf_file', 'Book PDF', 'pdf', { requiredOnCreate: true, removable: false }),
+      { name: 'pages', label: 'Pages', type: 'number', min: 1, step: 1, hint: 'Counted from the PDF when left empty.' },
+      rating,
+      { name: 'description', label: 'Description', type: 'textarea', span: 'full' },
+      {
+        name: 'chapters',
+        label: 'Chapters',
+        type: 'list',
+        addLabel: 'Add chapter',
+        itemFields: [{ name: 'title', label: 'Chapter title', type: 'text', required: true }],
+        example: [{ title: 'Chapter 1' }, { title: 'Chapter 2' }],
+      },
     ],
   },
-
-  /* ============================ AUDIOBOOKS ============================ */
   {
     key: 'audiobooks',
     slug: 'audiobooks',
@@ -161,35 +187,60 @@ export const CONTENT_TYPES = [
     label: 'Audiobooks',
     singular: 'Audiobook',
     icon: FaHeadphones,
-    description: 'Narrated books and long-form audio.',
-    endpoints: { list: '/collections/audiobooks/', create: '/collections/audiobooks/admin_create/' },
-    submitAs: 'multipart',
-    display: { title: 'title', subtitle: 'author_name', image: 'cover' },
+    description: 'Your own recording, or a YouTube video or playlist. Length and format are read from the recording.',
+    endpoint: `${API}/audiobooks/`,
+    summaryKey: 'audiobooks',
+    row: (item) => ({ title: item.title, subtitle: [item.author_name, item.duration].filter(Boolean).join(' · '), image: item.cover }),
+    filters: [
+      { name: 'author', label: 'Author', optionsFrom: 'authors' },
+      { name: 'language', label: 'Language', optionsFrom: 'audiobook_languages', options: opts('pa:Punjabi|en:English|hi:Hindi|ur:Urdu') },
+      F_PUBLISHED,
+    ],
     fields: [
       { name: 'title', label: 'Title', type: 'text', required: true, maxLength: 255 },
-      { name: 'author', label: 'Author', type: 'author' },
-      imageField('cover', 'Cover image'),
-      audioField('mp3_file', 'Audio file', { required: true }),
+      { name: 'title_pa', label: 'Title (Gurmukhi)', type: 'gurmukhi', maxLength: 255 },
+      { name: 'author', label: 'Author', type: 'select', optionsFrom: 'authors', numeric: true },
+      { name: 'narrator', label: 'Narrator', type: 'text' },
+      { name: 'language', label: 'Language', type: 'select', optionsFrom: 'audiobook_languages', options: opts('pa:Punjabi|en:English|hi:Hindi|ur:Urdu') },
+      { name: 'genre', label: 'Genre', type: 'text', placeholder: 'History, Sakhi…' },
+      file('cover', 'Cover', 'picture'),
+      { name: 'cover_credit', label: 'Cover credit', type: 'text' },
+      { name: 'cover_source_url', label: 'Cover source link', type: 'url' },
+      file('mp3_file', 'Recording', 'audio'),
       {
         name: 'duration',
-        label: 'Duration',
+        label: 'Length',
         type: 'text',
-        required: true,
-        placeholder: '2:30:15',
-        pattern: DURATION_PATTERN,
-        patternMessage: 'Use H:MM:SS, for example 2:30:15',
+        placeholder: '1:25:00',
+        pattern: DURATION,
+        patternMessage: 'Use H:MM:SS or MM:SS, e.g. 1:25:00.',
+        hint: 'Filled in from the recording; needed for YouTube audiobooks.',
       },
-      { name: 'format', label: 'Format', type: 'select', options: ['MP3', 'M4A', 'AAC', 'WAV'], defaultValue: 'MP3' },
-      { name: 'genre', label: 'Genre', type: 'text', maxLength: 100, placeholder: 'History, Biography, Sakhi…' },
-      { name: 'narrator', label: 'Narrator', type: 'text', maxLength: 150 },
-      ratingField,
-      languageField,
-      premiumField,
-      descriptionField,
+      { name: 'format', label: 'Format', type: 'text', placeholder: 'MP3', hint: 'Filled in from the recording.' },
+      youtubeId(),
+      { name: 'youtube_playlist_id', label: 'YouTube playlist id', type: 'text' },
+      { name: 'youtube_channel', label: 'YouTube channel', type: 'text' },
+      { name: 'source_url', label: 'Source link', type: 'url' },
+      rating,
+      published,
+      { name: 'description', label: 'Description', type: 'textarea', span: 'full' },
+      {
+        name: 'chapters',
+        label: 'Chapters',
+        type: 'list',
+        addLabel: 'Add chapter',
+        hint: 'YouTube chapters can’t be Premium-only (YouTube’s terms).',
+        itemFields: [
+          { name: 'title', label: 'Title', type: 'text', required: true },
+          { name: 'duration', label: 'Length', type: 'text', placeholder: '20:00' },
+          { name: 'youtube_id', label: 'YouTube id', type: 'text', pattern: YOUTUBE_ID },
+          { name: 'start_seconds', label: 'Starts at (s)', type: 'number', min: 0 },
+          { name: 'locked', label: 'Premium', type: 'checkbox' },
+        ],
+        example: [{ title: 'Part 1', duration: '20:00', start_seconds: 0 }],
+      },
     ],
   },
-
-  /* ============================== AUTHORS ============================= */
   {
     key: 'authors',
     slug: 'authors',
@@ -197,86 +248,51 @@ export const CONTENT_TYPES = [
     label: 'Authors',
     singular: 'Author',
     icon: FaUserEdit,
-    description: 'Writers, scholars and historians shown on book pages.',
-    endpoints: { list: '/collections/authors/', create: '/collections/authors/admin_create/' },
-    submitAs: 'multipart',
-    display: { title: 'name', subtitle: 'genre', image: 'image' },
+    description: 'Writers and scholars shown on ebook and audiobook pages.',
+    endpoint: `${API}/authors/`,
+    summaryKey: 'authors',
+    refreshChoices: true,
+    row: (item) => ({
+      title: item.name,
+      subtitle: [item.genre, `${item.book_count ?? 0} books · ${item.audiobook_count ?? 0} audiobooks`].filter(Boolean).join(' · '),
+      image: item.image,
+    }),
     fields: [
       { name: 'name', label: 'Full name', type: 'text', required: true, maxLength: 255 },
-      imageField('image', 'Portrait'),
+      { name: 'genre', label: 'Genre / field', type: 'text', placeholder: 'History, Poetry…' },
+      file('image', 'Portrait', 'picture'),
+      { name: 'image_credit', label: 'Portrait credit', type: 'text' },
+      { name: 'image_source_url', label: 'Portrait source link', type: 'url' },
+      rating,
       { name: 'born', label: 'Born', type: 'date' },
       { name: 'died', label: 'Died', type: 'date', hint: 'Leave empty if living.' },
-      { name: 'genre', label: 'Genre / field', type: 'text', maxLength: 100, placeholder: 'History, Gurmat, Poetry…' },
-      ratingField,
-      { name: 'notable_works', label: 'Notable works', type: 'textarea', maxLength: 2000, span: 'full' },
-      { name: 'biography', label: 'Biography', type: 'textarea', maxLength: 10000, span: 'full' },
-      { name: 'awards', label: 'Awards', type: 'textarea', maxLength: 2000, span: 'full' },
+      { name: 'notable_works', label: 'Notable works', type: 'textarea', span: 'full' },
+      { name: 'biography', label: 'Biography', type: 'textarea', rows: 6, span: 'full' },
+      { name: 'awards', label: 'Awards', type: 'textarea', span: 'full' },
     ],
   },
 
-  /* ========================= LEARNING MATERIAL ======================== */
+  /* =========================== LEARNING PORTAL ========================= */
   {
     key: 'learning',
     slug: 'learning-material',
     group: 'Learning portal',
     label: 'Learning Material',
-    singular: 'Learning material',
+    singular: 'Lesson',
     icon: FaGraduationCap,
-    description: 'Lessons, worksheets and videos for the school learning portal, organised by grade.',
-    endpoints: { list: '/collections/learning-materials/', create: '/collections/learning-materials/admin_create/' },
-    submitAs: 'multipart',
-    display: { title: 'title', subtitle: 'grade_level', image: 'thumbnail' },
+    description: 'Lessons for the learning portal: text, a video link or an uploaded video.',
+    endpoint: `${API}/learning-material/`,
+    summaryKey: 'learning_material',
+    row: learningRow,
+    filters: learningFilters,
     fields: [
-      { name: 'title', label: 'Title', type: 'text', required: true, maxLength: 255 },
-      {
-        name: 'subject',
-        label: 'Subject',
-        type: 'select',
-        required: true,
-        options: ['Gurmukhi (Punjabi)', 'Gurbani', 'Sikh History', 'Rehat Maryada', 'Kirtan & Music', 'Sikh Values', 'Other'],
-      },
-      { name: 'grade_level', label: 'Grade', type: 'select', required: true, options: GRADE_LEVELS },
-      { name: 'unit', label: 'Unit / chapter', type: 'text', maxLength: 150, placeholder: 'Unit 2 — Painti Akhri' },
-      {
-        name: 'material_type',
-        label: 'Material type',
-        type: 'select',
-        required: true,
-        options: ['PDF', 'Worksheet', 'Slides', 'Video', 'Audio'],
-        defaultValue: 'PDF',
-      },
-      {
-        name: 'file',
-        label: 'File',
-        type: 'file',
-        accept: [
-          'application/pdf',
-          'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-          'audio/mpeg',
-        ],
-        extensions: ['pdf', 'pptx', 'docx', 'mp3'],
-        maxMB: 100,
-        hint: 'PDF, PPTX, DOCX or MP3 · up to 100 MB',
-        showWhen: { field: 'material_type', in: ['PDF', 'Worksheet', 'Slides', 'Audio'] },
-      },
-      {
-        name: 'video_url',
-        label: 'Video link',
-        type: 'url',
-        placeholder: 'https://www.youtube.com/watch?v=…',
-        showWhen: { field: 'material_type', in: ['Video'] },
-      },
-      imageField('thumbnail', 'Thumbnail'),
-      { name: 'estimated_minutes', label: 'Lesson length (minutes)', type: 'number', min: 1, max: 600, step: 1 },
-      languageField,
-      premiumField,
-      { name: 'learning_objectives', label: 'Learning objectives', type: 'textarea', maxLength: 3000, span: 'full', hint: 'One objective per line.' },
-      descriptionField,
+      ...learningCommon,
+      { name: 'duration_minutes', label: 'Length (minutes)', type: 'number', min: 1, step: 1 },
+      { name: 'video_file', label: 'Video link', type: 'url', placeholder: 'https://www.youtube.com/watch?v=…' },
+      file('video_upload', '…or upload a video', 'video'),
+      { name: 'content', label: 'Lesson text', type: 'textarea', rows: 10, span: 'full', hint: 'Leave a blank line between sections.' },
     ],
   },
-
-  /* ============================== QUIZZES ============================= */
   {
     key: 'quizzes',
     slug: 'quizzes',
@@ -284,224 +300,345 @@ export const CONTENT_TYPES = [
     label: 'Quizzes',
     singular: 'Quiz',
     icon: FaQuestionCircle,
-    description: 'Multiple-choice quizzes. Build questions visually or paste JSON.',
-    endpoints: { list: '/collections/quizzes/', create: '/collections/quizzes/admin_create/' },
-    // Quizzes contain a nested `questions` array, so they are sent as JSON.
-    submitAs: 'json',
-    display: { title: 'title', subtitle: 'category' },
+    description: 'Multiple-choice quizzes. Saving the questions replaces all of them.',
+    endpoint: `${API}/quizzes/`,
+    summaryKey: 'quizzes',
+    row: (item) => ({
+      title: item.title,
+      subtitle: [item.category_name, item.question_count != null && `${item.question_count} questions`].filter(Boolean).join(' · '),
+      image: item.picture,
+    }),
+    filters: learningFilters,
     fields: [
-      { name: 'title', label: 'Quiz title', type: 'text', required: true, maxLength: 255 },
-      {
-        name: 'category',
-        label: 'Category',
-        type: 'select',
-        required: true,
-        options: ['Sikh History', 'Gurbani', 'Gurmukhi', 'Gurus', 'Rehat Maryada', 'General Knowledge'],
-      },
-      { name: 'difficulty', label: 'Difficulty', type: 'select', options: ['Easy', 'Medium', 'Hard'], defaultValue: 'Easy' },
-      { name: 'grade_level', label: 'Grade', type: 'select', options: GRADE_LEVELS },
-      { name: 'time_limit_minutes', label: 'Time limit (minutes)', type: 'number', min: 1, max: 180, step: 1, hint: 'Leave empty for no limit.' },
-      { name: 'pass_percentage', label: 'Pass mark (%)', type: 'number', min: 0, max: 100, step: 1, defaultValue: 60 },
-      premiumField,
-      descriptionField,
+      ...learningCommon,
+      { name: 'time_limit_seconds', label: 'Time limit (seconds)', type: 'number', min: 0, step: 1, hint: 'Empty = no limit.' },
+      { name: 'time_per_question_seconds', label: 'Time per question (seconds)', type: 'number', min: 0, step: 1 },
+      { name: 'pass_percentage', label: 'Pass mark (%)', type: 'number', min: 0, max: 100, step: 1 },
+      { name: 'max_attempts', label: 'Max attempts', type: 'number', min: 0, step: 1, hint: 'Empty = unlimited.' },
+      { name: 'shuffle_questions', label: 'Shuffle questions', type: 'checkbox', defaultValue: false },
       { name: 'questions', label: 'Questions', type: 'questions', required: true, span: 'full' },
     ],
   },
-
-  /* =============================== GAMES ============================== */
   {
-    key: 'games',
-    slug: 'games',
+    key: 'categories',
+    slug: 'topics',
     group: 'Learning portal',
-    label: 'Games',
-    singular: 'Game',
-    icon: FaGamepad,
-    description: 'Educational games — link to a hosted game or upload an HTML5 build.',
-    endpoints: { list: '/collections/games/', create: '/collections/games/admin_create/' },
-    submitAs: 'multipart',
-    display: { title: 'title', subtitle: 'game_type', image: 'thumbnail' },
+    label: 'Topics',
+    singular: 'Topic',
+    icon: FaTags,
+    description: 'The topics lessons, quizzes and games are filed under. A topic with items in it can’t be deleted.',
+    endpoint: `${API}/categories/`,
+    summaryKey: 'categories',
+    refreshChoices: true,
+    row: (item) => ({ title: item.name, subtitle: `${item.item_count ?? 0} items` }),
     fields: [
-      { name: 'title', label: 'Game title', type: 'text', required: true, maxLength: 255 },
-      {
-        name: 'game_type',
-        label: 'Game type',
-        type: 'select',
-        required: true,
-        options: ['Trivia', 'Puzzle', 'Memory', 'Word Game', 'Matching', 'Adventure'],
-      },
-      { name: 'age_group', label: 'Age group', type: 'select', options: AGE_GROUPS, defaultValue: 'All Ages' },
-      imageField('thumbnail', 'Thumbnail', { required: true }),
-      {
-        name: 'source',
-        label: 'How is the game delivered?',
-        type: 'select',
-        options: [
-          { value: 'url', label: 'Hosted link' },
-          { value: 'upload', label: 'Upload HTML5 build (.zip)' },
-        ],
-        defaultValue: 'url',
-        sendToApi: false,
-      },
-      { name: 'game_url', label: 'Game link', type: 'url', required: true, showWhen: { field: 'source', in: ['url'] } },
-      {
-        name: 'game_file',
-        label: 'Game build (.zip)',
-        type: 'file',
-        accept: ['application/zip', 'application/x-zip-compressed'],
-        extensions: ['zip'],
-        maxMB: 200,
-        required: true,
-        hint: 'ZIP containing index.html · up to 200 MB',
-        showWhen: { field: 'source', in: ['upload'] },
-      },
-      { name: 'how_to_play', label: 'How to play', type: 'textarea', maxLength: 3000, span: 'full' },
-      premiumField,
-      descriptionField,
+      { name: 'name', label: 'Name', type: 'text', required: true, maxLength: 100 },
+      { name: 'icon', label: 'Icon', type: 'text', placeholder: 'FaBook', hint: 'A react-icons name.' },
+      order,
+      { name: 'description', label: 'Description', type: 'textarea', span: 'full' },
     ],
   },
 
-  /* ============================== GURBANI ============================= */
+  /* ================================ GAMES ============================== */
+  {
+    key: 'games',
+    slug: 'games',
+    group: 'Games',
+    label: 'Game cards',
+    singular: 'Game card',
+    icon: FaGamepad,
+    description: 'The game cards on the Learning page and which game each one opens.',
+    endpoint: `${API}/games/`,
+    summaryKey: 'games',
+    row: learningRow,
+    filters: [{ name: 'game_key', label: 'Game', optionsFrom: 'game_keys' }, ...learningFilters],
+    fields: [
+      { name: 'game_key', label: 'Game', type: 'select', required: true, optionsFrom: 'game_keys', options: opts('word_search:Word Search|memory_match:Memory Match') },
+      ...learningCommon,
+      { name: 'game_settings', label: 'Game settings (JSON)', type: 'json', span: 'full', placeholder: '{ "grid": 10 }', hint: 'Optional options for the game, as a JSON object.' },
+    ],
+  },
+  {
+    key: 'game-words',
+    slug: 'game-words',
+    group: 'Games',
+    label: 'Word Search words',
+    singular: 'Word',
+    icon: FaFont,
+    description: 'Words for Word Search / Shabad Khoj: English letters plus the Gurmukhi word.',
+    endpoint: `${API}/game-words/`,
+    summaryKey: 'game_words',
+    row: (item) => ({ title: `${item.word} · ${item.punjabi}`, subtitle: [item.level_range, item.difficulty, item.category].filter(Boolean).join(' · ') }),
+    filters: [
+      { name: 'level_range', label: 'Levels', optionsFrom: 'word_levels', options: opts('1-10|11-20') },
+      { name: 'difficulty', label: 'Difficulty', optionsFrom: 'difficulties', options: DIFFICULTIES },
+      F_ACTIVE,
+    ],
+    fields: [
+      { name: 'word', label: 'Word (English letters)', type: 'text', required: true, pattern: /^[A-Za-z]+$/, patternMessage: 'English letters only — no spaces or numbers.' },
+      { name: 'punjabi', label: 'Word (Gurmukhi)', type: 'gurmukhi', required: true },
+      { name: 'game_key', label: 'Game', type: 'select', options: opts('word_search:Word Search'), defaultValue: 'word_search' },
+      { name: 'level_range', label: 'Levels', type: 'select', optionsFrom: 'word_levels', options: opts('1-10|11-20') },
+      { name: 'difficulty', label: 'Difficulty', type: 'select', optionsFrom: 'difficulties', options: DIFFICULTIES },
+      { name: 'category', label: 'Category', type: 'text', placeholder: 'Family' },
+      { name: 'hint', label: 'Hint', type: 'text' },
+      { name: 'is_active', label: 'Active', type: 'checkbox', defaultValue: true },
+    ],
+  },
+  {
+    key: 'arcade',
+    slug: 'arcade-content',
+    group: 'Games',
+    label: 'Arcade content',
+    singular: 'Arcade item',
+    icon: FaPuzzlePiece,
+    description: 'Letters, words, proverbs, events, people, places and jigsaw pictures for the map games.',
+    endpoint: `${API}/arcade-content/`,
+    summaryKey: 'arcade_content',
+    loadBuiltin: `${API}/arcade-content/load-builtin/`,
+    jsonImport: true,
+    row: (item) => ({ title: item.label || item.slug, subtitle: [item.game_key, item.difficulty, item.group].filter(Boolean).join(' · ') }),
+    filters: [
+      { name: 'game_key', label: 'Game', optionsFrom: 'arcade_games', options: ARCADE_GAMES },
+      { name: 'difficulty', label: 'Difficulty', optionsFrom: 'difficulties', options: DIFFICULTIES },
+      F_ACTIVE,
+    ],
+    fields: [
+      { name: 'game_key', label: 'Game', type: 'select', required: true, optionsFrom: 'arcade_games', options: ARCADE_GAMES, lockOnEdit: true },
+      { name: 'difficulty', label: 'Difficulty', type: 'select', optionsFrom: 'difficulties', options: DIFFICULTIES, defaultValue: 'easy' },
+      {
+        name: 'group',
+        label: 'Group',
+        type: 'select',
+        required: true,
+        optionsFn: (values, choices) => {
+          const live = (choices.arcade_games || []).find((g) => g.value === values.game_key);
+          return (live?.groups?.length ? live.groups : ARCADE_GROUPS[values.game_key] || []).map((g) => ({ value: g, label: g }));
+        },
+        showWhen: { field: 'game_key', in: Object.keys(ARCADE_GROUPS) },
+      },
+      order,
+      { name: 'slug', label: 'Short name', type: 'text', maxLength: 80, hint: 'Made up when left empty.' },
+      { name: 'is_active', label: 'Active', type: 'checkbox', defaultValue: true },
+      { name: 'data', label: 'Content', type: 'arcadeData', required: true, span: 'full' },
+    ],
+  },
+
+  /* ================================ GURMAT ============================= */
   {
     key: 'gurbani',
     slug: 'gurbani',
     group: 'Gurmat',
     label: 'Gurbani',
-    singular: 'Gurbani entry',
+    singular: 'Gurbani item',
     icon: FaPrayingHands,
-    description: 'Banis, Shabads, Kirtan and Katha — text, audio or video.',
-    endpoints: { list: '/collections/gurbani/', create: '/collections/gurbani/admin_create/' },
-    submitAs: 'multipart',
-    display: { title: 'title', subtitle: 'bani_type', image: 'cover_image' },
+    description: 'Shabads and banis (BaniDB text or a PDF), kirtan audio and video — same rules as Django admin.',
+    endpoint: `${API}/gurbani/`,
+    summaryKey: 'gurbani',
+    row: (item) => ({ title: item.title, subtitle: [item.type, item.category, item.artist].filter(Boolean).join(' · '), image: item.image }),
+    filters: [
+      { name: 'type', label: 'Type', optionsFrom: 'gurbani_types', options: opts('shabad:Shabad|audio:Audio|video:Video') },
+      { name: 'category', label: 'Category', optionsFrom: 'gurbani_categories' },
+      { name: 'access', label: 'Access', optionsFrom: 'gurbani_access', options: opts('free:Free|standard:Standard|premium:Premium') },
+      F_PUBLISHED,
+    ],
     fields: [
-      { name: 'title', label: 'Title (English)', type: 'text', required: true, maxLength: 255, placeholder: 'Japji Sahib' },
-      { name: 'title_gurmukhi', label: 'Title (Gurmukhi)', type: 'gurmukhi', maxLength: 255, placeholder: 'ਜਪੁਜੀ ਸਾਹਿਬ' },
-      {
-        name: 'bani_type',
-        label: 'Category',
-        type: 'select',
-        required: true,
-        options: ['Nitnem', 'Shabad', 'Kirtan', 'Katha', 'Ardas', 'Other'],
-      },
-      { name: 'media_type', label: 'Media', type: 'select', required: true, options: ['Text', 'Audio', 'Video'], defaultValue: 'Text' },
-      { name: 'ang', label: 'Ang (SGGS page)', type: 'number', min: 1, max: 1430, step: 1, hint: '1 – 1430' },
-      { name: 'raag', label: 'Raag', type: 'text', maxLength: 100, placeholder: 'Raag Asa' },
-      { name: 'writer', label: 'Bani of', type: 'select', options: GURUS },
-      {
-        name: 'artist',
-        label: 'Ragi / Kathavachak',
-        type: 'text',
-        maxLength: 150,
-        showWhen: { field: 'media_type', in: ['Audio', 'Video'] },
-      },
-      audioField('audio_file', 'Audio file', { required: true, showWhen: { field: 'media_type', in: ['Audio'] } }),
-      { name: 'video_url', label: 'Video link', type: 'url', required: true, showWhen: { field: 'media_type', in: ['Video'] } },
-      imageField('cover_image', 'Cover image'),
-      { name: 'gurmukhi_text', label: 'Gurmukhi text', type: 'gurmukhi', multiline: true, span: 'full', maxLength: 100000 },
-      { name: 'transliteration', label: 'Transliteration', type: 'textarea', span: 'full', maxLength: 100000 },
-      { name: 'translation', label: 'English translation', type: 'textarea', span: 'full', maxLength: 100000 },
-      premiumField,
+      { name: 'type', label: 'Type', type: 'select', required: true, optionsFrom: 'gurbani_types', options: opts('shabad:Shabad / bani (text)|audio:Audio|video:Video'), defaultValue: 'shabad' },
+      { name: 'category', label: 'Category', type: 'select', optionsFrom: 'gurbani_categories', options: opts('nitnem:Nitnem|bani:Bani|shabad:Shabad|kirtan:Kirtan|katha:Katha|simran:Simran|history:History') },
+      { name: 'title', label: 'Title (English)', type: 'text', required: true, maxLength: 200 },
+      { name: 'title_gurmukhi', label: 'Title (Gurmukhi)', type: 'gurmukhi' },
+      slug,
+      { name: 'writer', label: 'Bani of', type: 'text', placeholder: 'Guru Nanak Dev Ji' },
+      { name: 'raag', label: 'Raag', type: 'text' },
+      { name: 'ang', label: 'Ang', type: 'number', min: 1, max: 1430, step: 1 },
+      { name: 'banidb_kind', label: 'BaniDB text', type: 'select', optionsFrom: 'banidb_kinds', options: opts('shabad:Shabad|bani:Bani'), showWhen: { field: 'type', in: ['shabad'] } },
+      { name: 'banidb_id', label: 'BaniDB id', type: 'number', min: 1, step: 1, showWhen: { field: 'type', in: ['shabad'] } },
+      file('pdf_file', 'PDF', 'pdf', { showWhen: { field: 'type', in: ['shabad'] } }),
+      { name: 'artist', label: 'Ragi / Kathavachak', type: 'text', showWhen: { field: 'type', in: ['audio', 'video'] } },
+      file('audio_file', 'Audio file', 'audio', { showWhen: { field: 'type', in: ['audio'] } }),
+      file('video_file', 'Video file', 'video', { showWhen: { field: 'type', in: ['video'] } }),
+      youtubeId(),
+      { name: 'youtube_channel', label: 'YouTube channel', type: 'text', showWhen: { field: 'type', in: ['audio', 'video'] } },
+      { name: 'media_url', label: 'Media link (https)', type: 'url', httpsOnly: true, showWhen: { field: 'type', in: ['audio', 'video'] } },
+      { name: 'duration_seconds', label: 'Length (seconds)', type: 'number', min: 0, step: 1, hint: 'Measured from the audio file.', showWhen: { field: 'type', in: ['audio', 'video'] } },
+      { name: 'media_license', label: 'Licence', type: 'select', optionsFrom: 'gurbani_licences', options: opts('youtube:YouTube embed|cc-by:Creative Commons|permission:Owner’s permission|own:Our own') },
+      { name: 'permission_note', label: 'Permission note', type: 'text', showWhen: { field: 'media_license', in: ['permission'] } },
+      { name: 'source_url', label: 'Source link', type: 'url' },
+      { name: 'access', label: 'Access', type: 'select', optionsFrom: 'gurbani_access', options: opts('free:Free|standard:Standard|premium:Premium'), defaultValue: 'free', hint: 'YouTube videos stay Free.' },
+      file('image', 'Picture', 'picture'),
+      order,
+      published,
+      { name: 'description', label: 'Description', type: 'textarea', span: 'full' },
     ],
   },
-
-  /* ============================ SIKH HISTORY =========================== */
   {
     key: 'history',
     slug: 'sikh-history',
     group: 'Gurmat',
     label: 'Sikh History',
-    singular: 'History item',
+    singular: 'History article',
     icon: FaLandmark,
-    description: 'Articles, videos and podcasts about Sikh history.',
-    endpoints: { list: '/collections/sikh-history/', create: '/collections/sikh-history/admin_create/' },
-    submitAs: 'multipart',
-    display: { title: 'title', subtitle: 'era', image: 'cover_image' },
+    description: 'Articles made of sections, with sources and related articles.',
+    endpoint: `${API}/history/`,
+    summaryKey: 'history',
+    refreshChoices: true,
+    row: (item) => ({ title: item.title, subtitle: [item.category, item.date_label].filter(Boolean).join(' · '), image: item.image }),
+    filters: [{ name: 'category', label: 'Category', optionsFrom: 'history_categories' }, F_PUBLISHED],
     fields: [
-      { name: 'title', label: 'Title', type: 'text', required: true, maxLength: 255 },
-      { name: 'content_type', label: 'Format', type: 'select', required: true, options: ['Article', 'Video', 'Podcast'], defaultValue: 'Article' },
+      { name: 'title', label: 'Title', type: 'text', required: true, maxLength: 200 },
+      { name: 'title_pa', label: 'Title (Gurmukhi)', type: 'gurmukhi' },
+      { name: 'category', label: 'Category', type: 'select', required: true, optionsFrom: 'history_categories', options: opts('gurus:Gurus|khalsa:Khalsa|leaders:Leaders|events:Events|places:Places') },
+      slug,
+      { name: 'subtitle', label: 'Subtitle', type: 'text' },
+      { name: 'date_label', label: 'Date label', type: 'text', placeholder: '1469 – 1539' },
+      { name: 'start_year', label: 'Start year', type: 'number', step: 1 },
+      { name: 'end_year', label: 'End year', type: 'number', step: 1 },
+      file('image', 'Picture', 'picture'),
+      order,
+      published,
+      { name: 'summary', label: 'Summary', type: 'textarea', required: true, rows: 3, span: 'full' },
       {
-        name: 'era',
-        label: 'Era',
-        type: 'select',
-        required: true,
-        options: ['Guru Period (1469–1708)', 'Banda Singh Bahadur', 'Misl Period', 'Sikh Empire', 'Colonial Era', 'Partition', 'Modern Era', 'Diaspora'],
+        name: 'sections',
+        label: 'Sections',
+        type: 'list',
+        addLabel: 'Add section',
+        itemFields: [
+          { name: 'heading', label: 'Heading', type: 'text' },
+          { name: 'paragraphs', label: 'Text', type: 'textarea', required: true, hint: 'Blank line between paragraphs.' },
+        ],
+        example: [{ heading: 'Early life', paragraphs: 'First paragraph.\n\nSecond paragraph.' }],
       },
-      { name: 'year', label: 'Year / period', type: 'text', maxLength: 50, placeholder: '1699' },
-      { name: 'related_guru', label: 'Related Guru', type: 'select', options: GURUS },
-      imageField('cover_image', 'Cover image', { required: true }),
-      { name: 'video_url', label: 'Video link', type: 'url', required: true, showWhen: { field: 'content_type', in: ['Video'] } },
-      audioField('audio_file', 'Podcast audio', { required: true, showWhen: { field: 'content_type', in: ['Podcast'] } }),
-      { name: 'duration', label: 'Duration', type: 'text', placeholder: '0:45:00', pattern: DURATION_PATTERN, patternMessage: 'Use H:MM:SS', showWhen: { field: 'content_type', in: ['Video', 'Podcast'] } },
-      { name: 'tags', label: 'Tags', type: 'tags', placeholder: 'Khalsa, Vaisakhi, Anandpur Sahib', hint: 'Separate with commas.' },
-      languageField,
-      premiumField,
-      { name: 'summary', label: 'Short summary', type: 'textarea', maxLength: 500, span: 'full' },
-      { name: 'body', label: 'Article', type: 'textarea', maxLength: 100000, span: 'full', rows: 10, required: true, showWhen: { field: 'content_type', in: ['Article'] } },
-      { name: 'sources', label: 'Sources / references', type: 'textarea', maxLength: 5000, span: 'full' },
+      {
+        name: 'sources',
+        label: 'Sources',
+        type: 'list',
+        addLabel: 'Add source',
+        itemFields: [
+          { name: 'title', label: 'Title', type: 'text' },
+          { name: 'url', label: 'Link (https)', type: 'url', required: true, httpsOnly: true },
+        ],
+        example: [{ title: 'SikhiWiki', url: 'https://www.sikhiwiki.org' }],
+      },
+      { name: 'related', label: 'Related articles', type: 'multiselect', optionsFrom: 'history_articles', span: 'full' },
     ],
   },
-
-  /* ============================== SAKHIS ============================== */
   {
     key: 'sakhis',
     slug: 'sakhis',
     group: 'Gurmat',
-    label: 'Sakhis',
+    label: 'Sakhis & Kahaniyaan',
     singular: 'Sakhi',
     icon: FaFeatherAlt,
-    description: 'Stories from Sikh history with a moral — great for younger learners.',
-    endpoints: { list: '/collections/sakhis/', create: '/collections/sakhis/admin_create/' },
-    submitAs: 'multipart',
-    display: { title: 'title', subtitle: 'guru', image: 'cover_image' },
+    description: 'Sakhis and kahaniyaan — the category decides which. Leave a blank line between paragraphs.',
+    endpoint: `${API}/sakhis/`,
+    summaryKey: 'sakhis',
+    row: (item) => ({ title: item.title, subtitle: [item.kind, item.about || item.category].filter(Boolean).join(' · '), image: item.image }),
+    filters: [
+      { name: 'kind', label: 'Kind', options: opts('sakhi:Sakhis|kahani:Kahaniyaan') },
+      { name: 'category', label: 'Category', optionsFrom: 'sakhi_categories' },
+      F_PUBLISHED,
+    ],
     fields: [
-      { name: 'title', label: 'Title (English)', type: 'text', required: true, maxLength: 255 },
-      { name: 'title_gurmukhi', label: 'Title (Gurmukhi)', type: 'gurmukhi', maxLength: 255 },
-      { name: 'guru', label: 'Guru / figure', type: 'select', required: true, options: GURUS },
-      { name: 'age_group', label: 'Age group', type: 'select', options: AGE_GROUPS, defaultValue: 'All Ages' },
-      imageField('cover_image', 'Illustration', { required: true }),
-      audioField('audio_file', 'Narration audio'),
-      languageField,
-      premiumField,
-      { name: 'story', label: 'Story', type: 'textarea', required: true, maxLength: 50000, rows: 10, span: 'full' },
-      { name: 'moral', label: 'Lesson / moral', type: 'textarea', maxLength: 1000, span: 'full' },
-      { name: 'discussion_questions', label: 'Discussion questions', type: 'textarea', maxLength: 3000, span: 'full', hint: 'One question per line — for classroom use.' },
+      { name: 'title', label: 'Title', type: 'text', required: true, maxLength: 200 },
+      { name: 'title_pa', label: 'Title (Gurmukhi)', type: 'gurmukhi' },
+      { name: 'category', label: 'Category', type: 'select', optionsFrom: 'sakhi_categories', options: opts('gurus:Gurus|sikhs:Sikhs|bhagats:Bhagats|other:Other') },
+      { name: 'about', label: 'About', type: 'text', placeholder: 'Guru Nanak Dev Ji' },
+      slug,
+      file('image', 'Illustration', 'picture'),
+      file('audio_file', 'Read aloud (audio)', 'audio'),
+      youtubeId(),
+      { name: 'source', label: 'Source', type: 'text' },
+      { name: 'source_url', label: 'Source link', type: 'url' },
+      order,
+      published,
+      { name: 'summary', label: 'Summary', type: 'textarea', required: true, rows: 3, span: 'full' },
+      { name: 'story', label: 'Story', type: 'textarea', required: true, rows: 10, span: 'full' },
+      { name: 'story_pa', label: 'Story (Gurmukhi)', type: 'gurmukhi', multiline: true, rows: 8, span: 'full' },
+      { name: 'lesson', label: 'Lesson', type: 'textarea', span: 'full' },
+      { name: 'lesson_pa', label: 'Lesson (Gurmukhi)', type: 'gurmukhi', multiline: true, span: 'full' },
     ],
   },
 
-  /* ============================== EVENTS ============================== */
+  /* =============================== COMMUNITY =========================== */
   {
     key: 'events',
     slug: 'events',
     group: 'Community',
-    label: 'Events & Gurpurabs',
+    label: 'Events',
     singular: 'Event',
     icon: FaCalendarAlt,
-    description: 'Gurpurabs, Shaheedi days, Sangrand and community events for the Nanakshahi calendar.',
-    endpoints: { list: '/collections/events/', create: '/collections/events/admin_create/' },
-    submitAs: 'multipart',
-    display: { title: 'title', subtitle: 'date', image: 'image' },
+    description: 'Community events. Events members add wait here until approved.',
+    endpoint: `${API}/events/`,
+    summaryKey: 'events',
+    row: (item) => ({ title: item.title, subtitle: [item.start_date, item.location].filter(Boolean).join(' · '), image: item.image }),
+    filters: [
+      { name: 'is_approved', label: 'Status', options: opts('false:Waiting for approval|true:Approved') },
+      { name: 'when', label: 'When', options: opts('upcoming:Upcoming|past:Past') },
+      { name: 'kind', label: 'Kind', optionsFrom: 'event_kinds' },
+    ],
     fields: [
-      { name: 'title', label: 'Event name', type: 'text', required: true, maxLength: 255 },
-      {
-        name: 'event_type',
-        label: 'Type',
-        type: 'select',
-        required: true,
-        options: [
-          { value: 'gurpurab', label: 'Gurpurab' },
-          { value: 'shaheedi', label: 'Shaheedi Purab' },
-          { value: 'sangrand', label: 'Sangrand' },
-          { value: 'festival', label: 'Festival (Vaisakhi, Bandi Chhor…)' },
-          { value: 'event', label: 'Community event' },
-        ],
-      },
-      { name: 'date', label: 'Date', type: 'date', required: true },
-      { name: 'end_date', label: 'End date', type: 'date', hint: 'For multi-day events.' },
-      { name: 'time', label: 'Start time', type: 'time' },
-      { name: 'location', label: 'Location', type: 'text', maxLength: 255, placeholder: 'Gurdwara, city' },
-      imageField('image', 'Image'),
+      { name: 'title', label: 'Event name', type: 'text', required: true, maxLength: 200 },
+      { name: 'kind', label: 'Kind', type: 'select', optionsFrom: 'event_kinds', options: opts('event:Event|gurpurab:Gurpurab|sangrand:Sangrand|festival:Festival|kirtan:Kirtan|other:Other'), defaultValue: 'event' },
+      { name: 'location', label: 'Location', type: 'text', required: true, placeholder: 'Gurdwara, city' },
+      { name: 'start_date', label: 'Date', type: 'date', required: true },
+      { name: 'end_date', label: 'End date', type: 'date' },
+      { name: 'start_time', label: 'Start time', type: 'time' },
       { name: 'link', label: 'More info link', type: 'url' },
-      { name: 'is_recurring', label: 'Repeats every year', type: 'checkbox', defaultValue: false },
-      descriptionField,
+      file('image', 'Picture', 'picture'),
+      { name: 'is_approved', label: 'Approved (shown on the website)', type: 'checkbox', defaultValue: true },
+      { name: 'is_featured', label: 'Featured', type: 'checkbox', defaultValue: false },
+      { name: 'description', label: 'One-line description', type: 'text', span: 'full', maxLength: 300 },
+      { name: 'details', label: 'Details', type: 'textarea', span: 'full' },
+    ],
+  },
+  {
+    key: 'gurpurabs',
+    slug: 'gurpurabs',
+    group: 'Community',
+    label: 'Gurpurabs',
+    singular: 'Calendar day',
+    icon: FaCalendarCheck,
+    description: 'The Nanakshahi calendar. Days added or changed here are kept when a year is rebuilt.',
+    endpoint: `${API}/gurpurabs/`,
+    summaryKey: 'gurpurabs',
+    row: (item) => ({ title: item.title, subtitle: [item.date, item.nanakshahi_date, item.kind].filter(Boolean).join(' · ') }),
+    filters: [
+      { name: 'year', label: 'Year', type: 'number', defaultValue: () => String(new Date().getFullYear()) },
+      { name: 'month', label: 'Month', options: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((m, i) => ({ value: String(i + 1), label: m })) },
+      { name: 'kind', label: 'Kind', optionsFrom: 'gurpurab_kinds' },
+      { name: 'is_custom', label: 'Source', options: opts('true:Added here|false:Built-in') },
+    ],
+    fields: [
+      { name: 'title', label: 'Name', type: 'text', required: true, maxLength: 200 },
+      { name: 'date', label: 'Date', type: 'date', required: true },
+      { name: 'kind', label: 'Kind', type: 'select', required: true, optionsFrom: 'gurpurab_kinds', options: opts('gurpurab:Gurpurab|shaheedi:Shaheedi Purab|festival:Festival|historical:Historical|sangrand:Sangrand|puranmashi:Puranmashi|masya:Masya') },
+      { name: 'nanakshahi_date', label: 'Nanakshahi date', type: 'text', hint: 'Worked out from the date when left empty.' },
+      { name: 'is_lunar', label: 'Follows the lunar calendar', type: 'checkbox', defaultValue: false },
+      { name: 'description', label: 'Description', type: 'textarea', span: 'full' },
+    ],
+  },
+  {
+    key: 'news',
+    slug: 'news',
+    group: 'Community',
+    label: 'News',
+    singular: 'News article',
+    icon: FaNewspaper,
+    description: 'News and announcements for the website.',
+    endpoint: `${API}/news/`,
+    summaryKey: 'news',
+    row: (item) => ({ title: item.title, subtitle: [item.category, item.published_at && String(item.published_at).slice(0, 10)].filter(Boolean).join(' · '), image: item.image }),
+    filters: [{ name: 'category', label: 'Category', optionsFrom: 'news_categories' }, F_PUBLISHED],
+    fields: [
+      { name: 'title', label: 'Headline', type: 'text', required: true, maxLength: 255 },
+      { name: 'category', label: 'Category', type: 'select', optionsFrom: 'news_categories', options: opts('news:News|announcement:Announcement|history:History|community:Community') },
+      { name: 'published_at', label: 'Publish date', type: 'datetime' },
+      { name: 'source_url', label: 'Source link', type: 'url' },
+      file('image', 'Picture', 'picture'),
+      published,
+      { name: 'is_featured', label: 'Featured', type: 'checkbox', defaultValue: false },
+      { name: 'excerpt', label: 'Excerpt', type: 'textarea', rows: 3, span: 'full' },
+      { name: 'body', label: 'Article', type: 'textarea', rows: 10, span: 'full' },
     ],
   },
 ];
@@ -512,4 +649,4 @@ export const CONTENT_TYPES = [
 export const CONTENT_TYPES_BY_SLUG = Object.fromEntries(CONTENT_TYPES.map((type) => [type.slug, type]));
 
 /** Sidebar groups in display order. */
-export const CONTENT_GROUPS = ['Library', 'Learning portal', 'Gurmat', 'Community'];
+export const CONTENT_GROUPS = ['Library', 'Learning portal', 'Games', 'Gurmat', 'Community'];
