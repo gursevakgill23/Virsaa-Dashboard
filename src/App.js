@@ -3,7 +3,7 @@
  *
  *   /login                  public sign-in page
  *   /dashboard              overview (protected)
- *   /users/:filterType      all | basic | premium (protected)
+ *   /users/:filterType      all | free | paid | admins (protected; view and edit accounts)
  *   /uploads/:type          any content type from config/contentTypes.js (protected)
  *
  * Pages are lazy-loaded so the login screen downloads as little code as

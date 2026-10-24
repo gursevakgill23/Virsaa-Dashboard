@@ -1,23 +1,49 @@
 /**
- * Users — members list for All / Basic / Premium, with search, sort and
- * CSV export. The filter comes from the URL: /users/all | basic | premium.
+ * Users — the Members pages: every account, page by page, with search,
+ * filters, CSV export and an editor for each account (UserEditor.jsx).
+ *
+ *   /users/all      everyone
+ *   /users/free     Free membership          (old link /users/basic)
+ *   /users/paid     any paid plan            (old link /users/premium)
+ *   /users/admins   staff and superusers
+ *
+ * Data: GET /api/dashboard/users/ (dashboard_api/users.py), searched and
+ * filtered on the server, 25 at a time. If the server doesn't have that
+ * section yet, the page falls back to the older read-only list
+ * (/api/auth/users/<all|basic|premium>/) and says editing needs the update.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
-import { FaUsers, FaSearch, FaSyncAlt, FaDownload, FaCrown, FaShieldAlt } from 'react-icons/fa';
-import { api, getErrorMessage, toList } from '../../api/client';
+import {
+  FaUsers, FaSearch, FaSyncAlt, FaDownload, FaCrown, FaPen, FaBan, FaExclamationTriangle,
+} from 'react-icons/fa';
+import { api, getErrorMessage, toCount, toList } from '../../api/client';
+import useDebouncedValue from '../../hooks/useDebouncedValue';
 import PageHeader from '../../components/ui/PageHeader';
 import Avatar from '../../components/ui/Avatar';
+import UserEditor from './UserEditor';
+import { RoleBadge, fullName, isPaid } from './memberUtils';
 import pageStyles from '../../styles/Page.module.css';
 import styles from './Users.module.css';
 
-const FILTERS = {
-  all: { title: 'All members', subtitle: 'Everyone with a Virsaa account.' },
-  basic: { title: 'Basic plan', subtitle: 'Members on the free Basic plan.' },
-  premium: { title: 'Premium members', subtitle: 'Members with an active Premium subscription.' },
-};
+const PAGE_SIZE = 25;
 
-const fullName = (u) => [u.first_name, u.last_name].filter(Boolean).join(' ') || u.username || '—';
+const FILTERS = {
+  all: { title: 'All members', subtitle: 'Everyone with a Virsaa account. Open one to change its membership, access or roles.', params: {}, legacy: 'all' },
+  free: { title: 'Free members', subtitle: 'Accounts on the Free membership.', params: { plan: 'free' }, legacy: 'basic' },
+  paid: { title: 'Paid members', subtitle: 'Accounts on a paid plan (Basic, Standard, Premium…).', params: { plan: 'paid' }, legacy: 'premium' },
+  admins: { title: 'Admins', subtitle: 'Staff can use this dashboard; superusers can also manage other admins.', params: { role: 'staff' }, legacy: null },
+};
+const OLD_LINKS = { basic: 'free', premium: 'paid', staff: 'admins' };
+
+const SORTS = [
+  { value: '-joined_date', label: 'Newest first' },
+  { value: 'joined_date', label: 'Oldest first' },
+  { value: '-last_logined', label: 'Recently signed in' },
+  { value: 'username', label: 'Username A–Z' },
+];
+
+const formatDate = (value) => (value ? new Date(value).toLocaleDateString() : '—');
 
 /**
  * Escapes a value for CSV and neutralises spreadsheet formula injection
@@ -31,64 +57,122 @@ const csvCell = (value) => {
 
 const Users = () => {
   const { filterType } = useParams();
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [query, setQuery] = useState('');
-  const [sort, setSort] = useState('newest');
-  const requestId = useRef(0);
-
   const filter = FILTERS[filterType] ? filterType : null;
 
-  const load = useCallback(async () => {
-    if (!filter) return;
-    const id = ++requestId.current;
-    setLoading(true);
-    setError('');
-    try {
-      const { data } = await api.get(`/api/auth/users/${filter}/`);
-      if (id === requestId.current) setUsers(toList(data));
-    } catch (err) {
-      if (id === requestId.current) {
-        setUsers([]);
-        setError(getErrorMessage(err, 'Could not load members.'));
+  const [rows, setRows] = useState([]);
+  const [count, setCount] = useState(0);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState('');
+  const [legacy, setLegacy] = useState(false); // the server has no /api/dashboard/users/ yet
+
+  const [query, setQuery] = useState('');
+  const [status, setStatus] = useState(''); // '' | active | off | unverified
+  const [sort, setSort] = useState('-joined_date');
+  const [editingId, setEditingId] = useState(null);
+  const search = useDebouncedValue(query.trim(), 350);
+  const requestId = useRef(0);
+
+  const paramsFor = useCallback(
+    (pageNumber) => {
+      const params = { ...FILTERS[filter].params, page: pageNumber, page_size: PAGE_SIZE, ordering: sort };
+      if (search) params.search = search;
+      if (status === 'active') params.is_active = 'true';
+      if (status === 'off') params.is_active = 'false';
+      if (status === 'unverified') params.is_email_verified = 'false';
+      return params;
+    },
+    [filter, search, sort, status]
+  );
+
+  /** Older backend: the whole list at once, searched and sorted here. */
+  const loadLegacy = useCallback(async () => {
+    const which = FILTERS[filter].legacy;
+    if (!which) return { list: [], total: 0 };
+    const { data } = await api.get(`/api/auth/users/${which}/`);
+    const q = search.toLowerCase();
+    const list = toList(data)
+      .filter((u) => !q || `${fullName(u)} ${u.username || ''} ${u.email || ''}`.toLowerCase().includes(q))
+      .sort((a, b) => new Date(b.joined_date || 0) - new Date(a.joined_date || 0));
+    return { list, total: list.length };
+  }, [filter, search]);
+
+  const load = useCallback(
+    async (pageNumber = 1) => {
+      if (!filter) return;
+      const id = ++requestId.current;
+      if (pageNumber === 1) setLoading(true);
+      else setLoadingMore(true);
+      setError('');
+      try {
+        const { data } = await api.get('/api/dashboard/users/', { params: paramsFor(pageNumber) });
+        if (id !== requestId.current) return;
+        const list = toList(data);
+        setRows((current) => (pageNumber === 1 ? list : [...current, ...list.filter((u) => !current.some((c) => c.id === u.id))]));
+        setCount(toCount(data));
+        setHasMore(Boolean(data?.next));
+        setPage(pageNumber);
+        setLegacy(false);
+      } catch (err) {
+        if (id !== requestId.current) return;
+        if (err?.response?.status === 404 && pageNumber === 1) {
+          try {
+            const { list, total } = await loadLegacy();
+            if (id !== requestId.current) return;
+            setRows(list);
+            setCount(total);
+            setHasMore(false);
+            setLegacy(true);
+            return;
+          } catch (legacyErr) {
+            if (id === requestId.current) setError(getErrorMessage(legacyErr, 'Could not load members.'));
+          }
+        } else {
+          setError(getErrorMessage(err, 'Could not load members.'));
+        }
+        if (pageNumber === 1) setRows([]);
+      } finally {
+        if (id === requestId.current) {
+          setLoading(false);
+          setLoadingMore(false);
+        }
       }
-    } finally {
-      if (id === requestId.current) setLoading(false);
-    }
-  }, [filter]);
+    },
+    [filter, paramsFor, loadLegacy]
+  );
 
   useEffect(() => {
-    setQuery('');
-    load();
+    load(1);
   }, [load]);
 
-  const visible = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const list = q
-      ? users.filter((u) => `${fullName(u)} ${u.username || ''} ${u.email || ''}`.toLowerCase().includes(q))
-      : users.slice();
-    list.sort((a, b) => {
-      if (sort === 'name') return fullName(a).localeCompare(fullName(b));
-      const diff = new Date(b.joined_date || 0) - new Date(a.joined_date || 0);
-      return sort === 'oldest' ? -diff : diff;
-    });
-    return list;
-  }, [users, query, sort]);
+  // A different page of the menu starts with a clean search and a closed editor.
+  useEffect(() => {
+    setQuery('');
+    setStatus('');
+    setEditingId(null);
+  }, [filterType]);
 
-  /** Downloads the currently visible rows as a CSV file (built locally). */
+  /** The editor saved or deleted an account: update the row in place. */
+  const onSaved = (updated) => setRows((current) => current.map((u) => (u.id === updated.id ? { ...u, ...updated } : u)));
+  const onDeleted = (id) => {
+    setRows((current) => current.filter((u) => u.id !== id));
+    setCount((n) => Math.max(0, n - 1));
+    setEditingId(null);
+  };
+
+  /** Downloads the loaded rows as a CSV file (built in the browser). */
   const exportCsv = () => {
-    const header = ['Name', 'Username', 'Email', 'Membership', 'Joined', 'Staff', 'Superuser'];
-    const rows = visible.map((u) => [
-      fullName(u),
-      u.username,
-      u.email,
-      u.membership_level,
+    const header = ['Name', 'Username', 'Email', 'Membership', 'Joined', 'Last sign-in', 'Active', 'Email verified', 'Staff', 'Superuser'];
+    const yesNo = (v) => (v ? 'yes' : 'no');
+    const lines = rows.map((u) => [
+      fullName(u), u.username, u.email, u.membership_level,
       u.joined_date ? new Date(u.joined_date).toISOString().slice(0, 10) : '',
-      u.is_staff ? 'yes' : 'no',
-      u.is_superuser ? 'yes' : 'no',
+      u.last_logined ? new Date(u.last_logined).toISOString().slice(0, 10) : '',
+      yesNo(u.is_active !== false), yesNo(u.is_email_verified), yesNo(u.is_staff), yesNo(u.is_superuser),
     ]);
-    const csv = [header, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n');
+    const csv = [header, ...lines].map((row) => row.map(csvCell).join(',')).join('\r\n');
     const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }));
     const link = document.createElement('a');
     link.href = url;
@@ -97,7 +181,9 @@ const Users = () => {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
-  if (!filter) return <Navigate to="/users/all" replace />;
+  if (!filter) return <Navigate to={`/users/${OLD_LINKS[filterType] || 'all'}`} replace />;
+
+  const editing = rows.find((u) => u.id === editingId) || null;
 
   return (
     <>
@@ -108,20 +194,31 @@ const Users = () => {
         subtitle={FILTERS[filter].subtitle}
         actions={
           <>
-            <button type="button" className={`${pageStyles.button} ${pageStyles.buttonGhost}`} onClick={load} disabled={loading}>
+            <button type="button" className={`${pageStyles.button} ${pageStyles.buttonGhost}`} onClick={() => load(1)} disabled={loading}>
               <FaSyncAlt aria-hidden="true" /> Refresh
             </button>
             <button
               type="button"
               className={`${pageStyles.button} ${pageStyles.buttonGradient}`}
               onClick={exportCsv}
-              disabled={loading || visible.length === 0}
+              disabled={loading || rows.length === 0}
+              title={hasMore ? 'Exports the members loaded so far' : undefined}
             >
               <FaDownload aria-hidden="true" /> Export CSV
             </button>
           </>
         }
       />
+
+      {legacy && (
+        <div className={styles.notice} role="status">
+          <FaExclamationTriangle aria-hidden="true" />
+          <span>
+            Read-only list: the server doesn’t have the Members section of <code>dashboard_api</code> yet
+            (<code>/api/dashboard/users/</code>). Deploy the updated backend to edit accounts.
+          </span>
+        </div>
+      )}
 
       <section className={`${pageStyles.card} ${pageStyles.fadeIn}`}>
         <div className={styles.toolbar}>
@@ -136,15 +233,32 @@ const Users = () => {
               maxLength={100}
             />
           </div>
-          <label className={styles.sort}>
-            <span>Sort</span>
-            <select value={sort} onChange={(e) => setSort(e.target.value)}>
-              <option value="newest">Newest first</option>
-              <option value="oldest">Oldest first</option>
-              <option value="name">Name A–Z</option>
-            </select>
-          </label>
-          <span className={styles.count}>{loading ? 'Loading…' : `${visible.length.toLocaleString()} of ${users.length.toLocaleString()}`}</span>
+          {!legacy && (
+            <>
+              <label className={styles.sort}>
+                <span>Show</span>
+                <select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Account status">
+                  <option value="">Any status</option>
+                  <option value="active">Switched on</option>
+                  <option value="off">Switched off</option>
+                  <option value="unverified">Email not verified</option>
+                </select>
+              </label>
+              <label className={styles.sort}>
+                <span>Sort</span>
+                <select value={sort} onChange={(e) => setSort(e.target.value)}>
+                  {SORTS.map((s) => (
+                    <option key={s.value} value={s.value}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </>
+          )}
+          <span className={styles.count}>
+            {loading ? 'Loading…' : `${rows.length.toLocaleString()} of ${count.toLocaleString()}`}
+          </span>
         </div>
 
         {error && (
@@ -164,84 +278,115 @@ const Users = () => {
                     Joined
                   </th>
                   <th scope="col" className={styles.hideMd}>
-                    Interests
+                    Last sign-in
                   </th>
                   <th scope="col">Role</th>
+                  <th scope="col" className={styles.actionsCol}>
+                    <span className="sr-only">Actions</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {loading &&
                   [0, 1, 2, 3, 4].map((i) => (
                     <tr key={`s${i}`} aria-hidden="true">
-                      <td colSpan={5}>
+                      <td colSpan={6}>
                         <span className={pageStyles.skeleton} style={{ display: 'block', height: 18 }} />
                       </td>
                     </tr>
                   ))}
 
-                {!loading && visible.length === 0 && (
+                {!loading && rows.length === 0 && (
                   <tr>
-                    <td colSpan={5}>
+                    <td colSpan={6}>
                       <div className={pageStyles.empty}>
-                        <p className={pageStyles.emptyTitle}>{query ? 'No matching members' : 'No members yet'}</p>
+                        <p className={pageStyles.emptyTitle}>{query || status ? 'No matching members' : 'No members here yet'}</p>
                       </div>
                     </td>
                   </tr>
                 )}
 
                 {!loading &&
-                  visible.map((u) => {
-                    const isPremium = String(u.membership_level || '').toLowerCase().includes('premium');
-                    const interests = Array.isArray(u.preferred_content) ? u.preferred_content : [];
-                    return (
-                      <tr key={u.id ?? u.email}>
-                        <td>
-                          <div className={styles.member}>
-                            <Avatar src={u.profile_photo} name={fullName(u)} size={38} />
-                            <div className={styles.memberText}>
-                              <strong>{fullName(u)}</strong>
-                              <small>{u.email}</small>
-                            </div>
-                          </div>
-                        </td>
-                        <td>
-                          <span className={`${pageStyles.pill} ${isPremium ? pageStyles.pillGold : ''}`}>
-                            {isPremium && <FaCrown aria-hidden="true" />} {u.membership_level || 'Basic'}
-                          </span>
-                        </td>
-                        <td className={styles.hideSm}>{u.joined_date ? new Date(u.joined_date).toLocaleDateString() : '—'}</td>
-                        <td className={styles.hideMd}>
-                          <div className={styles.chips}>
-                            {interests.slice(0, 3).map((item) => (
-                              <span key={String(item)} className={styles.chip}>
-                                {String(item)}
-                              </span>
-                            ))}
-                            {interests.length > 3 && <span className={styles.chip}>+{interests.length - 3}</span>}
-                            {interests.length === 0 && '—'}
-                          </div>
-                        </td>
-                        <td>
-                          {u.is_superuser ? (
-                            <span className={`${pageStyles.pill} ${pageStyles.pillGold}`}>
-                              <FaShieldAlt aria-hidden="true" /> Superuser
+                  rows.map((u) => (
+                    <tr
+                      key={u.id ?? u.email}
+                      className={`${!legacy ? styles.clickable : ''} ${u.id === editingId ? styles.selected : ''}`}
+                      onClick={legacy ? undefined : () => setEditingId(u.id)}
+                    >
+                      <td>
+                        <div className={styles.member}>
+                          <Avatar src={u.profile_photo} name={fullName(u)} size={38} />
+                          <div className={styles.memberText}>
+                            <strong>
+                              {fullName(u)} {u.is_you && <span className={styles.you}>You</span>}
+                            </strong>
+                            <small>{u.email}</small>
+                            <span className={styles.flags}>
+                              {u.is_active === false && (
+                                <span className={styles.flagOff}>
+                                  <FaBan aria-hidden="true" /> Switched off
+                                </span>
+                              )}
+                              {u.is_email_verified === false && <span className={styles.flagWarn}>Email not verified</span>}
                             </span>
-                          ) : u.is_staff ? (
-                            <span className={pageStyles.pill}>
-                              <FaShieldAlt aria-hidden="true" /> Staff
-                            </span>
-                          ) : (
-                            <span className={styles.muted}>Member</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <span className={`${pageStyles.pill} ${isPaid(u) ? pageStyles.pillGold : ''}`}>
+                          {isPaid(u) && <FaCrown aria-hidden="true" />} {u.membership_level || 'Free'}
+                        </span>
+                      </td>
+                      <td className={styles.hideSm}>{formatDate(u.joined_date)}</td>
+                      <td className={styles.hideMd}>{formatDate(u.last_logined)}</td>
+                      <td>
+                        <RoleBadge user={u} />
+                      </td>
+                      <td className={styles.actionsCol}>
+                        {!legacy && (
+                          <button
+                            type="button"
+                            className={styles.editButton}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingId(u.id);
+                            }}
+                            aria-label={`Edit ${fullName(u)}`}
+                          >
+                            <FaPen aria-hidden="true" /> <span className={styles.hideSm}>Edit</span>
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>
         )}
+
+        {hasMore && !loading && (
+          <div className={styles.more}>
+            <button
+              type="button"
+              className={`${pageStyles.button} ${pageStyles.buttonGhost}`}
+              onClick={() => load(page + 1)}
+              disabled={loadingMore}
+            >
+              {loadingMore ? 'Loading…' : `Load more (${(count - rows.length).toLocaleString()} left)`}
+            </button>
+          </div>
+        )}
       </section>
+
+      {editing && (
+        <UserEditor
+          key={editing.id}
+          summary={editing}
+          onClose={() => setEditingId(null)}
+          onSaved={onSaved}
+          onDeleted={onDeleted}
+        />
+      )}
     </>
   );
 };

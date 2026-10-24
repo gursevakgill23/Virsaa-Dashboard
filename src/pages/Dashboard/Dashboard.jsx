@@ -1,7 +1,8 @@
 /**
  * Dashboard — overview from GET /api/dashboard/ (how many of everything,
- * how many are hidden, what is waiting for a look) plus member counts from
- * /api/auth/users/. Requests run in parallel; one failing never blanks the page.
+ * how many are hidden, what is waiting for a look, member counts) and the
+ * newest accounts from /api/dashboard/users/. Requests run in parallel; one
+ * failing never blanks the page.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -55,16 +56,33 @@ const Dashboard = () => {
   const load = useCallback(async () => {
     setLoading(true);
     setSummaryError('');
-    const [overview, all, premium, basic] = await Promise.allSettled([
+    // The summary has member counts (users: {...}) and users/ the newest accounts.
+    const [overview, newest] = await Promise.allSettled([
       api.get('/api/dashboard/'),
+      api.get('/api/dashboard/users/', { params: { ordering: '-joined_date', page_size: 6 } }),
+    ]);
+
+    const data = overview.status === 'fulfilled' ? overview.value.data || {} : null;
+    if (data) setSummary(data);
+    else setSummaryError(getErrorMessage(overview.reason, 'Could not load the overview.'));
+
+    if (data?.users && newest.status === 'fulfilled') {
+      setMembers({
+        all: data.users.total ?? null,
+        premium: data.users.paid ?? null,
+        basic: data.users.free ?? null,
+        newest: toList(newest.value.data).slice(0, 6),
+      });
+      setLoading(false);
+      return;
+    }
+
+    // An older backend without the Members section: count the full lists instead.
+    const [all, premium, basic] = await Promise.allSettled([
       api.get('/api/auth/users/all/'),
       api.get('/api/auth/users/premium/'),
       api.get('/api/auth/users/basic/'),
     ]);
-
-    if (overview.status === 'fulfilled') setSummary(overview.value.data || {});
-    else setSummaryError(getErrorMessage(overview.reason, 'Could not load the overview.'));
-
     const countOf = (r) => (r.status === 'fulfilled' ? toCount(r.value.data) : null);
     setMembers({
       all: countOf(all),
@@ -98,8 +116,8 @@ const Dashboard = () => {
   const firstName = user?.first_name || user?.username || 'Admin';
 
   const tiles = [
-    { label: 'Members', value: members.all, icon: FaUsers, to: '/users/all' },
-    { label: 'Premium members', value: members.premium, icon: FaCrown, to: '/users/premium', note: premiumShare !== null ? `${premiumShare}% of members` : '' },
+    { label: 'Members', value: members.all, icon: FaUsers, to: '/users/all', note: summary?.users?.unverified ? `${summary.users.unverified} not verified` : '' },
+    { label: 'Paid members', value: members.premium, icon: FaCrown, to: '/users/paid', note: premiumShare !== null ? `${premiumShare}% of members` : '' },
     { label: 'Ebooks', value: summary?.ebooks?.total, icon: FaBook, to: '/uploads/ebooks' },
     { label: 'Audiobooks', value: summary?.audiobooks?.total, icon: FaHeadphones, to: '/uploads/audiobooks', note: summary?.audiobooks?.hidden ? `${summary.audiobooks.hidden} hidden` : '' },
   ];
@@ -201,18 +219,18 @@ const Dashboard = () => {
               Membership plans
             </h2>
             <div className={styles.donutWrap}>
-              <div className={styles.donut} style={{ '--premium': `${premiumShare ?? 0}%` }} role="img" aria-label={premiumShare !== null ? `${premiumShare}% of members are Premium` : 'Membership data unavailable'}>
+              <div className={styles.donut} style={{ '--premium': `${premiumShare ?? 0}%` }} role="img" aria-label={premiumShare !== null ? `${premiumShare}% of members are on a paid plan` : 'Membership data unavailable'}>
                 <span>
                   <strong>{premiumShare !== null ? `${premiumShare}%` : '—'}</strong>
-                  <small>Premium</small>
+                  <small>Paid</small>
                 </span>
               </div>
               <ul className={styles.legend}>
                 <li>
-                  <span className={`${styles.dot} ${styles.dotPremium}`} /> Premium <strong>{formatNumber(members.premium)}</strong>
+                  <span className={`${styles.dot} ${styles.dotPremium}`} /> Paid plans <strong>{formatNumber(members.premium)}</strong>
                 </li>
                 <li>
-                  <span className={`${styles.dot} ${styles.dotBasic}`} /> Basic <strong>{formatNumber(members.basic)}</strong>
+                  <span className={`${styles.dot} ${styles.dotBasic}`} /> Free <strong>{formatNumber(members.basic)}</strong>
                 </li>
               </ul>
             </div>
@@ -239,8 +257,8 @@ const Dashboard = () => {
                       <strong>{name}</strong>
                       <small>{m.joined_date ? new Date(m.joined_date).toLocaleDateString() : m.email}</small>
                     </span>
-                    {/premium/i.test(String(m.membership_level || '')) && (
-                      <span className={`${pageStyles.pill} ${pageStyles.pillGold}`}>
+                    {m.membership_level && !/^free$/i.test(m.membership_level) && (
+                      <span className={`${pageStyles.pill} ${pageStyles.pillGold}`} title={m.membership_level}>
                         <FaCrown aria-hidden="true" />
                       </span>
                     )}

@@ -3,8 +3,10 @@
  *
  * Responsibilities:
  *   - Restore a session from cookies on page load (only if still valid).
- *   - Admin-only login (rejects non-staff accounts client-side as well; the
- *     backend must still enforce IsAdminUser on every admin endpoint).
+ *   - Admin-only login in two steps: password + reCAPTCHA, then the 6-digit
+ *     code Django emails to every staff account (rejects non-staff accounts
+ *     client-side as well; the backend enforces IsAdminUser on every
+ *     admin endpoint).
  *   - Logout (blacklists the refresh token on the server, then clears cookies).
  *   - Auto sign-out after inactivity and when the API reports an expired session.
  */
@@ -51,31 +53,99 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   /* ------------------------------------------------------------------ */
-  /* Login                                                               */
+  /* Login, in two steps                                                 */
+  /*                                                                     */
+  /*   1. login()       email/username + password + reCAPTCHA            */
+  /*                    → /api/auth/login/                               */
+  /*      Staff accounts always get { two_factor_required, challenge }   */
+  /*      instead of tokens: the server has emailed a 6-digit code.      */
+  /*   2. verifyCode()  { challenge, code } → /api/auth/login/verify/    */
+  /*                    → { access, refresh, user }                      */
+  /*      resendCode()  { challenge } → /api/auth/login/resend/          */
+  /*                                                                     */
+  /* The challenge ties the code to this sign-in. It is kept only in the */
+  /* Login page's memory (never in cookies or storage), so a reload      */
+  /* simply starts again.                                                */
   /* ------------------------------------------------------------------ */
-  const login = useCallback(async ({ identifier, password, captcha }) => {
-    const payload = {
-      login: String(identifier || '').trim(), // email or username, same as the web app
-      password,
-      captcha, // reCAPTCHA token from the login form (each token works once)
-      remember_me: false,
-    };
 
-    const { data } = await api.post('/api/auth/login/', payload, {
-      headers: { 'Content-Type': 'application/json' },
-    });
-
+  /** Saves the session from a finished sign-in, or refuses non-admin accounts. */
+  const finishSignIn = useCallback(async (data) => {
     if (!data?.access || !data?.refresh) {
       throw new Error('The server did not return a session. Please try again.');
     }
     if (!isAdmin(data.user)) {
-      // Do not keep tokens for non-admin users at all.
+      // Never keep tokens for non-admin accounts; end the session on the server as well.
+      api.post('/api/auth/logout/', { refresh_token: data.refresh }).catch(() => {});
       throw new Error('This account does not have admin access.');
     }
-
     tokenStorage.setSession({ access: data.access, refresh: data.refresh, user: data.user });
     setUser(tokenStorage.getUser());
     return data.user;
+  }, []);
+
+  /**
+   * Step 1. Resolves to either
+   *   { status: 'signed_in', user }
+   *   { status: 'code', challenge, emailHint, expiresIn, resendIn, message }
+   */
+  const login = useCallback(
+    async ({ identifier, password, captcha }) => {
+      const payload = {
+        login: String(identifier || '').trim(), // email or username, same as the web app
+        password,
+        captcha, // reCAPTCHA token from the login form (each token works once)
+        remember_me: false,
+      };
+      const { data } = await api.post('/api/auth/login/', payload);
+
+      if (data?.two_factor_required) {
+        if (typeof data.challenge !== 'string' || !data.challenge) {
+          throw new Error('The server asked for a sign-in code but sent no challenge. Please try again.');
+        }
+        return {
+          status: 'code',
+          challenge: data.challenge,
+          emailHint: typeof data.email_hint === 'string' ? data.email_hint : '',
+          expiresIn: Number(data.expires_in) || 600,
+          resendIn: Number(data.resend_in) || 60,
+          message: typeof data.message === 'string' ? data.message : '',
+        };
+      }
+      return { status: 'signed_in', user: await finishSignIn(data) };
+    },
+    [finishSignIn]
+  );
+
+  /** Step 2: the 6-digit code from the email (spaces are fine). Resolves to the user. */
+  const verifyCode = useCallback(
+    async ({ challenge, code }) => {
+      const { data } = await api.post('/api/auth/login/verify/', {
+        challenge,
+        code: String(code || '').replace(/\D/g, '').slice(0, 6),
+      });
+      return finishSignIn(data);
+    },
+    [finishSignIn]
+  );
+
+  /** Emails a new code for the same sign-in (the older code stops working). */
+  const resendCode = useCallback(async ({ challenge }) => {
+    const { data } = await api.post('/api/auth/login/resend/', { challenge });
+    return {
+      emailHint: typeof data?.email_hint === 'string' ? data.email_hint : '',
+      expiresIn: Number(data?.expires_in) || 600,
+      resendIn: Number(data?.resend_in) || 60,
+      sendsLeft: Number.isFinite(Number(data?.sends_left)) ? Number(data.sends_left) : null,
+      message: typeof data?.message === 'string' ? data.message : '',
+    };
+  }, []);
+
+  /** Lets pages refresh the saved user (e.g. after editing your own name). */
+  const updateSavedUser = useCallback((changes) => {
+    const current = tokenStorage.getUser();
+    if (!current) return;
+    tokenStorage.setUser({ ...current, ...changes });
+    setUser(tokenStorage.getUser());
   }, []);
 
   /* ------------------------------------------------------------------ */
@@ -153,8 +223,8 @@ export const AuthProvider = ({ children }) => {
   }, [isAuthenticated, navigate]);
 
   const value = useMemo(
-    () => ({ user, isAuthenticated, login, logout, getErrorMessage }),
-    [user, isAuthenticated, login, logout]
+    () => ({ user, isAuthenticated, login, verifyCode, resendCode, logout, updateSavedUser, getErrorMessage }),
+    [user, isAuthenticated, login, verifyCode, resendCode, logout, updateSavedUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

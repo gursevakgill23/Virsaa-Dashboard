@@ -112,3 +112,504 @@
     margin-left: 0;
   }
 }
+
+/* =============================================================================
+ * Members list: rows open the editor
+ * ========================================================================== */
+.clickable {
+  cursor: pointer;
+}
+
+.clickable:focus-within {
+  background: rgba(var(--primary-rgb), 0.05);
+}
+
+.selected td {
+  background: rgba(var(--primary-rgb), 0.07);
+}
+
+.actionsCol {
+  width: 1%;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.editButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--input-border-color);
+  border-radius: var(--radius-pill);
+  background: var(--input-bg-color);
+  color: var(--primary-color);
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.editButton:hover {
+  border-color: var(--primary-color);
+  background: rgba(var(--primary-rgb), 0.08);
+}
+
+.editButton:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+.flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 3px;
+}
+
+.flags:empty {
+  display: none;
+}
+
+.flagOff,
+.flagWarn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  padding: 1px 9px;
+  border-radius: var(--radius-pill);
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.flagOff {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.flagWarn {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.you {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  background: rgba(var(--primary-rgb), 0.12);
+  color: var(--primary-color);
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+.more {
+  display: flex;
+  justify-content: center;
+  padding-top: 18px;
+}
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 18px;
+  padding: 12px 16px;
+  border: 1px solid rgba(201, 162, 74, 0.45);
+  border-radius: var(--radius-md);
+  background: var(--warning-soft);
+  color: var(--text-color);
+  font-size: 0.9rem;
+}
+
+.notice svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+  color: var(--warning);
+}
+
+.notice code {
+  font-size: 0.85em;
+}
+
+/* =============================================================================
+ * The account editor: a glass panel sliding in from the right
+ * ========================================================================== */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1500; /* above the navbar (950), sidebar (1001) and menus (1200) */
+  display: flex;
+  justify-content: flex-end;
+  background: rgba(20, 3, 8, 0.42);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  animation: overlayIn 0.2s ease;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  width: min(520px, 100%);
+  height: 100%;
+  border-left: 1px solid var(--glass-border);
+  background: var(--glass-bg-strong);
+  box-shadow: var(--shadow-deep), var(--glass-highlight);
+  backdrop-filter: blur(22px) saturate(1.3);
+  -webkit-backdrop-filter: blur(22px) saturate(1.3);
+  outline: none;
+  animation: panelIn 0.32s var(--ease-out);
+}
+
+@keyframes overlayIn {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes panelIn {
+  from {
+    transform: translateX(40px);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay,
+  .panel {
+    animation: none;
+  }
+}
+
+.panelHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 22px 22px 18px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--aura);
+}
+
+.panelTitle {
+  flex: 1;
+  min-width: 0;
+}
+
+.panelTitle h2 {
+  margin: 0;
+  color: var(--headline-color);
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.panelTitle p {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 0;
+  color: var(--secondary-text-color);
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.panelBadges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.close {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--input-border-color);
+  border-radius: 50%;
+  background: var(--input-bg-color);
+  color: var(--primary-color);
+  cursor: pointer;
+}
+
+.close:hover {
+  background: rgba(var(--primary-rgb), 0.08);
+}
+
+.close:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+.panelBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 22px 24px;
+  overscroll-behavior: contain;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 0 0 18px;
+}
+
+.facts > div {
+  padding: 10px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--card-bg-color);
+}
+
+.facts dt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--secondary-text-color);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.facts dd {
+  margin: 2px 0 0;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A titled block of the form (fieldset or section) */
+.group {
+  min-width: 0;
+  margin: 0 0 16px;
+  padding: 14px 16px 6px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--card-bg-color);
+}
+
+.group legend,
+.groupTitle {
+  margin: 0;
+  padding: 0 6px;
+  color: var(--headline-color);
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.groupTitle {
+  padding: 0 0 8px;
+}
+
+/* Fields inside a fieldset get the same breathing room as the content forms */
+fieldset.group {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-bottom: 16px;
+}
+
+fieldset.group .switchBlock {
+  padding: 0 0 10px;
+}
+
+.group[disabled] {
+  opacity: 0.75;
+}
+
+.twoCols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.switchBlock {
+  padding: 4px 0;
+  border-bottom: 1px dashed var(--border-color);
+}
+
+.switchBlock:last-of-type {
+  border-bottom: none;
+}
+
+.switchText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.switchText small {
+  color: var(--secondary-text-color);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.switchLocked {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.lockedReason {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 0;
+  color: var(--secondary-text-color);
+  font-size: 0.8rem;
+}
+
+/* Under a switch, line the reason up with the switch's label */
+.switchBlock .lockedReason {
+  margin: 0 0 8px 58px;
+}
+
+.actionRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px dashed var(--border-color);
+}
+
+.actionRow:last-child {
+  border-bottom: none;
+}
+
+.actionRow > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.actionRow small {
+  color: var(--secondary-text-color);
+  font-size: 0.82rem;
+}
+
+.actionRow button {
+  flex-shrink: 0;
+}
+
+/* Delete */
+.danger {
+  border-color: rgba(179, 38, 30, 0.35);
+  background: linear-gradient(var(--danger-soft), var(--danger-soft)), var(--card-bg-color);
+  padding-bottom: 14px;
+}
+
+.danger .groupTitle {
+  color: var(--danger);
+}
+
+.dangerText {
+  margin: 0 0 12px;
+  color: var(--text-color);
+  font-size: 0.88rem;
+}
+
+.danger code {
+  padding: 0 5px;
+  border-radius: 6px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 0.85em;
+}
+
+.dangerButton {
+  border-color: var(--danger) !important;
+  background: var(--danger) !important;
+  color: #fff !important;
+}
+
+[data-theme='dark'] .dangerButton {
+  color: #3a0a06 !important;
+}
+
+.dangerButton:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+/* Footer: errors, the "please check" box, Close / Save */
+.panelFooter {
+  padding: 14px 22px 18px;
+  border-top: 1px solid var(--border-color);
+  background: var(--glass-bg-strong);
+}
+
+.footerError {
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.confirmBox {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(201, 162, 74, 0.5);
+  border-radius: var(--radius-md);
+  background: var(--warning-soft);
+  font-size: 0.88rem;
+}
+
+.confirmBox svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+  color: var(--warning);
+}
+
+.confirmBox ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+.footerButtons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+@media (max-width: 560px) {
+  .panel {
+    width: 100%;
+    border-left: none;
+  }
+
+  .panelHeader,
+  .panelBody,
+  .panelFooter {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .twoCols,
+  .facts {
+    grid-template-columns: 1fr;
+  }
+
+  .actionRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .footerButtons > * {
+    flex: 1;
+  }
+}

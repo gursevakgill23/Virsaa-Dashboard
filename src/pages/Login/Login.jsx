@@ -1,5 +1,7 @@
 /**
- * Login — admin sign-in.
+ * Login — admin sign-in, in two steps:
+ *   1. email or username, password and reCAPTCHA
+ *   2. the 6-digit code Django emails to every staff account (CodeStep.jsx)
  * Design echoes the web app's loading screen: a deep maroon stage with a
  * glowing glass archway, the Virsaa wordmark and a glass sign-in card.
  *
@@ -8,6 +10,8 @@
  *   - After 5 failed attempts the form locks for 30s (slows guessing from
  *     this browser — the backend must still rate-limit the login endpoint).
  *   - Non-admin accounts are rejected and their tokens are discarded.
+ *   - Staff accounts always finish with an emailed 6-digit code; the
+ *     password alone never gives a session (auth_api/two_factor.py).
  *   - Google reCAPTCHA v2, the same widget and key as Virsaa-Web; the backend
  *     verifies the token, and each token is single-use so it resets after
  *     every attempt.
@@ -21,6 +25,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { getErrorMessage } from '../../api/client';
 import { ENV } from '../../config/env';
+import CodeStep from './CodeStep';
 import styles from './Login.module.css';
 
 const MAX_ATTEMPTS = 5;
@@ -43,6 +48,8 @@ const Login = () => {
   const passwordRef = useRef(null);
   const recaptchaRef = useRef(null);
   const [captchaDone, setCaptchaDone] = useState(false);
+  // Step 2: { challenge, emailHint, expiresIn, resendIn, message } once the password was right.
+  const [pending, setPending] = useState(null);
 
   // Where to go after signing in (only internal paths are allowed).
   const from = typeof location.state?.from === 'string' && location.state.from.startsWith('/') && !location.state.from.startsWith('//')
@@ -85,10 +92,14 @@ const Login = () => {
 
     setSubmitting(true);
     try {
-      const user = await login({ identifier: trimmedIdentifier, password, captcha });
+      const result = await login({ identifier: trimmedIdentifier, password, captcha });
       setAttempts(0);
-      toast.success(`Welcome back${user?.first_name ? `, ${user.first_name}` : ''}!`);
-      navigate(from, { replace: true });
+      setPassword(''); // not needed any more, so don't keep it in memory
+      if (result.status === 'code') {
+        setPending(result);
+        return;
+      }
+      welcome(result.user);
     } catch (err) {
       const nextAttempts = attempts + 1;
       setAttempts(nextAttempts);
@@ -114,6 +125,21 @@ const Login = () => {
       recaptchaRef.current?.reset(); // tokens are single-use
       setCaptchaDone(false);
     }
+  };
+
+  /** Signed in: greet and go where the admin was heading. */
+  function welcome(user) {
+    toast.success(`Welcome back${user?.first_name ? `, ${user.first_name}` : ''}!`);
+    navigate(from, { replace: true });
+  }
+
+  /** Back to step 1 (a different account, or the code can't be used any more). */
+  const restart = (message) => {
+    setPending(null);
+    setPassword('');
+    setError(message || '');
+    setCaptchaDone(false);
+    window.requestAnimationFrame(() => (message ? passwordRef.current?.focus() : null));
   };
 
   const onPasswordKey = (event) => setCapsLock(Boolean(event.getModifierState?.('CapsLock')));
@@ -154,124 +180,132 @@ const Login = () => {
         </button>
 
         <div className={styles.card}>
-          <p className={styles.eyebrow}>Admin sign in</p>
-          <h1 className={styles.title}>Sat Sri Akal 🙏</h1>
-          <p className={styles.subtitle}>Sign in with your Virsaa staff account to manage content and members.</p>
+          {pending ? (
+            <CodeStep pending={pending} onVerified={welcome} onRestart={restart} />
+          ) : (
+            <>
+              <p className={styles.eyebrow}>Admin sign in · Step 1 of 2</p>
+              <h1 className={styles.title}>Sat Sri Akal 🙏</h1>
+              <p className={styles.subtitle}>Sign in with your Virsaa staff account to manage content and members.</p>
 
-          <form className={styles.form} onSubmit={handleSubmit} noValidate>
-            <div className={styles.field}>
-              <label htmlFor="login-email">Email or username</label>
-              <div className={styles.inputWrap}>
-                <FaUser aria-hidden="true" />
-                <input
-                  id="login-email"
-                  type="text"
-                  autoComplete="username"
-                  autoCapitalize="none"
-                  spellCheck={false}
-                  placeholder="you@virsaa.com"
-                  value={identifier}
-                  onChange={(e) => setIdentifier(e.target.value)}
-                  disabled={submitting}
-                  maxLength={254}
-                  required
-                  autoFocus
-                />
-              </div>
-            </div>
-
-            <div className={styles.field}>
-              <label htmlFor="login-password">Password</label>
-              <div className={styles.inputWrap}>
-                <FaLock aria-hidden="true" />
-                <input
-                  ref={passwordRef}
-                  id="login-password"
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete="current-password"
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  onKeyDown={onPasswordKey}
-                  onKeyUp={onPasswordKey}
-                  disabled={submitting}
-                  maxLength={128}
-                  required
-                />
-                <button
-                  type="button"
-                  className={styles.reveal}
-                  onClick={() => setShowPassword((s) => !s)}
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  aria-pressed={showPassword}
-                >
-                  {showPassword ? <FaEyeSlash /> : <FaEye />}
-                </button>
-              </div>
-              {capsLock && <small className={styles.warning}>Caps Lock is on.</small>}
-            </div>
-
-            {/* reCAPTCHA — Google draws it in a fixed 304×78 iframe we can't restyle,
-                so it sits in a rounded "verification" frame that crops its square
-                border and matches the inputs. key={theme} remounts it so it follows
-                light/dark mode. */}
-            <div className={styles.field}>
-              <span className={styles.captchaLabel}>
-                Verification
-                {captchaDone && (
-                  <span className={styles.captchaOk}>
-                    <FaCheckCircle aria-hidden="true" /> Verified
-                  </span>
-                )}
-              </span>
-              {ENV.RECAPTCHA_SITE_KEY ? (
-                <div className={`${styles.captchaFrame} ${theme === 'dark' ? styles.captchaFrameDark : ''}`}>
-                  <ReCAPTCHA
-                    key={theme}
-                    ref={recaptchaRef}
-                    sitekey={ENV.RECAPTCHA_SITE_KEY}
-                    theme={theme === 'dark' ? 'dark' : 'light'}
-                    onChange={(value) => {
-                      setCaptchaDone(Boolean(value));
-                      setError('');
-                    }}
-                    onExpired={() => {
-                      setCaptchaDone(false);
-                      setError('The reCAPTCHA expired. Tick the box again.');
-                    }}
-                    onErrored={() => {
-                      setCaptchaDone(false);
-                      setError('reCAPTCHA could not load. Check your connection and reload.');
-                    }}
-                  />
+              <form className={styles.form} onSubmit={handleSubmit} noValidate>
+                <div className={styles.field}>
+                  <label htmlFor="login-email">Email or username</label>
+                  <div className={styles.inputWrap}>
+                    <FaUser aria-hidden="true" />
+                    <input
+                      id="login-email"
+                      type="text"
+                      autoComplete="username"
+                      autoCapitalize="none"
+                      spellCheck={false}
+                      placeholder="you@virsaa.com"
+                      value={identifier}
+                      onChange={(e) => setIdentifier(e.target.value)}
+                      disabled={submitting}
+                      maxLength={254}
+                      required
+                      autoFocus
+                    />
+                  </div>
                 </div>
-              ) : (
-                <small className={styles.warning}>Missing REACT_APP_RECAPTCHA_PUBLIC_KEY</small>
-              )}
-            </div>
 
-            {error && (
-              <p className={styles.error} role="alert">
-                {error}
-              </p>
-            )}
+                <div className={styles.field}>
+                  <label htmlFor="login-password">Password</label>
+                  <div className={styles.inputWrap}>
+                    <FaLock aria-hidden="true" />
+                    <input
+                      ref={passwordRef}
+                      id="login-password"
+                      type={showPassword ? 'text' : 'password'}
+                      autoComplete="current-password"
+                      placeholder="Enter your password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      onKeyDown={onPasswordKey}
+                      onKeyUp={onPasswordKey}
+                      disabled={submitting}
+                      maxLength={128}
+                      required
+                    />
+                    <button
+                      type="button"
+                      className={styles.reveal}
+                      onClick={() => setShowPassword((s) => !s)}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      aria-pressed={showPassword}
+                    >
+                      {showPassword ? <FaEyeSlash /> : <FaEye />}
+                    </button>
+                  </div>
+                  {capsLock && <small className={styles.warning}>Caps Lock is on.</small>}
+                </div>
 
-            <button type="submit" className={styles.submit} disabled={submitting || lockedFor > 0}>
-              {lockedFor > 0 ? (
-                `Try again in ${lockedFor}s`
-              ) : submitting ? (
-                <>
-                  <span className={styles.spinner} aria-hidden="true" /> Signing in…
-                </>
-              ) : (
-                <>
-                  Sign in <FaArrowRight aria-hidden="true" />
-                </>
-              )}
-            </button>
-          </form>
+                {/* reCAPTCHA — Google draws it in a fixed 304×78 iframe we can't restyle,
+                    so it sits in a rounded "verification" frame that crops its square
+                    border and matches the inputs. key={theme} remounts it so it follows
+                    light/dark mode. */}
+                <div className={styles.field}>
+                  <span className={styles.captchaLabel}>
+                    Verification
+                    {captchaDone && (
+                      <span className={styles.captchaOk}>
+                        <FaCheckCircle aria-hidden="true" /> Verified
+                      </span>
+                    )}
+                  </span>
+                  {ENV.RECAPTCHA_SITE_KEY ? (
+                    <div className={`${styles.captchaFrame} ${theme === 'dark' ? styles.captchaFrameDark : ''}`}>
+                      <ReCAPTCHA
+                        key={theme}
+                        ref={recaptchaRef}
+                        sitekey={ENV.RECAPTCHA_SITE_KEY}
+                        theme={theme === 'dark' ? 'dark' : 'light'}
+                        onChange={(value) => {
+                          setCaptchaDone(Boolean(value));
+                          setError('');
+                        }}
+                        onExpired={() => {
+                          setCaptchaDone(false);
+                          setError('The reCAPTCHA expired. Tick the box again.');
+                        }}
+                        onErrored={() => {
+                          setCaptchaDone(false);
+                          setError('reCAPTCHA could not load. Check your connection and reload.');
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <small className={styles.warning}>Missing REACT_APP_RECAPTCHA_PUBLIC_KEY</small>
+                  )}
+                </div>
 
-          <p className={styles.footnote}>Only staff accounts can access this area. Activity may be logged.</p>
+                {error && (
+                  <p className={styles.error} role="alert">
+                    {error}
+                  </p>
+                )}
+
+                <button type="submit" className={styles.submit} disabled={submitting || lockedFor > 0}>
+                  {lockedFor > 0 ? (
+                    `Try again in ${lockedFor}s`
+                  ) : submitting ? (
+                    <>
+                      <span className={styles.spinner} aria-hidden="true" /> Signing in…
+                    </>
+                  ) : (
+                    <>
+                      Sign in <FaArrowRight aria-hidden="true" />
+                    </>
+                  )}
+                </button>
+              </form>
+            </>
+          )}
+
+          <p className={styles.footnote}>
+            Only staff accounts can access this area. Every sign-in needs a code from your email. Activity may be logged.
+          </p>
         </div>
       </section>
     </div>

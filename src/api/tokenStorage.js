@@ -110,6 +110,14 @@ export const tokenStorage = {
     }
   },
 
+  /** Replaces the saved user (same cookie lifetime as the refresh token). */
+  setUser: (user) => {
+    const safeUser = pickSafeUser(user);
+    const refresh = Cookies.get(KEYS.REFRESH);
+    if (!safeUser || !refresh) return;
+    Cookies.set(KEYS.USER, JSON.stringify(safeUser), { ...baseCookieOptions(), expires: expiryFor(refresh, 7) });
+  },
+
   /** Removes every session cookie, including the old dashboard's names. */
   clear: () => {
     const options = { path: '/' };

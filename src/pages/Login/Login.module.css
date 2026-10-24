@@ -381,6 +381,156 @@
   text-align: center;
 }
 
+/* ---------------- Step 2: the emailed code ---------------- */
+.codeStep {
+  animation: cardIn 0.4s var(--ease-out) both;
+}
+
+.codeIcon {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  margin-bottom: 16px;
+  border-radius: 18px;
+  background: linear-gradient(150deg, var(--maroon-bright), var(--maroon) 55%, var(--maroon-deep));
+  box-shadow: 0 12px 24px -14px rgba(63, 2, 18, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  color: #fff;
+  font-size: 1.35rem;
+}
+
+.hint {
+  color: var(--text-color);
+  font-weight: 700;
+  word-break: break-all;
+}
+
+/* One real input laid over six drawn boxes: autofill, paste and screen readers all see a normal field. */
+.codeBoxes {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+}
+
+.codeInput {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: transparent;
+  caret-color: transparent;
+  font-size: 16px; /* stops iOS zooming in */
+  letter-spacing: 2em;
+  outline: none;
+  cursor: text;
+}
+
+.codeInput::selection {
+  background: transparent;
+}
+
+.codeBox {
+  display: grid;
+  place-items: center;
+  height: 58px;
+  border: 1px solid var(--input-border-color);
+  border-radius: 16px;
+  background: var(--input-bg-color);
+  color: var(--text-color);
+  font-family: var(--font-display, inherit);
+  font-size: 1.6rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.codeBoxGap {
+  margin-right: 8px;
+}
+
+.codeBoxFilled {
+  border-color: rgba(var(--primary-rgb), 0.45);
+}
+
+.codeInput:focus ~ .codeBoxActive {
+  border-color: var(--input-focus-border-color);
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.16);
+  transform: translateY(-1px);
+}
+
+.codeBoxesError .codeBox {
+  border-color: var(--danger);
+}
+
+.codeInput:disabled ~ .codeBox {
+  opacity: 0.6;
+}
+
+.codeMeta {
+  color: var(--secondary-text-color);
+  font-size: 0.84rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.info {
+  padding: 10px 14px;
+  border-left: 4px solid var(--success);
+  border-radius: 12px;
+  background: var(--success-soft);
+  color: var(--text-color);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.codeActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 14px;
+}
+
+.linkButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 2px;
+  border: 0;
+  background: none;
+  color: var(--primary-color);
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.linkButton:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.linkButton:disabled {
+  color: var(--secondary-text-color);
+  cursor: default;
+}
+
+@media (max-width: 380px) {
+  .codeBoxes {
+    gap: 5px;
+  }
+
+  .codeBox {
+    height: 50px;
+    border-radius: 12px;
+    font-size: 1.35rem;
+  }
+
+  .codeBoxGap {
+    margin-right: 4px;
+  }
+}
+
 /* ---------------- Animations ---------------- */
 @keyframes breathe {
   0%,
