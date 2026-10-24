@@ -1,11 +1,12 @@
 /**
  * AdminLayout — the shell for every signed-in page:
- * sidebar on the left, sticky top bar, and the routed page in <Outlet />.
+ * sidebar on the left, sticky top bar, the routed page in <Outlet /> and the footer.
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from '../Sidebar/Sidebar';
 import Navbar from '../Navbar/Navbar';
+import Footer from '../Footer/Footer';
 import styles from './AdminLayout.module.css';
 
 const AdminLayout = () => {
@@ -31,6 +32,7 @@ const AdminLayout = () => {
         <main id="main-content" className={styles.content} tabIndex={-1}>
           <Outlet />
         </main>
+        <Footer />
       </div>
     </div>
   );

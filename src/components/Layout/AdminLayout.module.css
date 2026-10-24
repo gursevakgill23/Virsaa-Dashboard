@@ -25,7 +25,7 @@
 .content {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 28px var(--page-gutter) 64px;
+  padding: 28px var(--page-gutter) 48px;
   outline: none;
 }
 

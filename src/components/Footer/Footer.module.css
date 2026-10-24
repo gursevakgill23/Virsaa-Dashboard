@@ -1,0 +1,369 @@
+/* =============================================================================
+ * Footer — heritage band, site map and bottom bar.
+ * Uses the design tokens in styles/themes.css, so light and dark mode follow
+ * the rest of the dashboard automatically.
+ * ========================================================================== */
+.footer {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 var(--page-gutter) 28px;
+}
+
+/* ---------------- 1. Heritage band ---------------- */
+.band {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px 32px;
+  padding: 28px 32px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-xl);
+  background: radial-gradient(120% 140% at 0% 0%, rgba(201, 162, 74, 0.22), transparent 55%),
+    linear-gradient(135deg, var(--maroon-bright) 0%, var(--maroon) 45%, var(--maroon-deep) 100%);
+  box-shadow: var(--shadow-deep);
+  color: #fff;
+  isolation: isolate;
+}
+
+/* A soft gold glow drifting behind the archway */
+.bandGlow {
+  position: absolute;
+  top: -60%;
+  left: -6%;
+  z-index: -1;
+  width: 340px;
+  height: 340px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 220, 160, 0.28), transparent 65%);
+  filter: blur(10px);
+  pointer-events: none;
+}
+
+.brand {
+  display: flex;
+  flex: 1 1 380px;
+  align-items: center;
+  gap: 20px;
+  min-width: 0;
+}
+
+/* The ੴ archway: the login page's doorway in miniature */
+.arch {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 64px;
+  height: 82px;
+  border: 1.5px solid rgba(232, 200, 120, 0.85);
+  border-radius: 50% 50% 10px 10px / 42% 42% 10px 10px;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.04) 50%), rgba(63, 2, 18, 0.35);
+  box-shadow: 0 0 26px rgba(255, 210, 140, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.arch span {
+  margin-top: 10px;
+  color: var(--gold-soft);
+  font-size: 1.9rem;
+  line-height: 1;
+  text-shadow: 0 0 16px rgba(255, 220, 150, 0.6);
+}
+
+.wordmark {
+  margin: 0;
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 1.7rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.1;
+}
+
+.gurmukhi {
+  margin-left: 6px;
+  color: #f1d58c;
+  font-family: var(--font-body);
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.mission {
+  max-width: 520px;
+  margin: 6px 0 0;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.shortcut {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 18px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: background 0.2s ease, transform 0.2s var(--ease-out), border-color 0.2s ease;
+}
+
+.shortcut:hover {
+  border-color: rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.shortcut:focus-visible {
+  outline: 2px solid #f1d58c;
+  outline-offset: 3px;
+}
+
+.shortcut svg {
+  font-size: 0.85em;
+  opacity: 0.9;
+}
+
+.shortcutLive {
+  border-color: transparent;
+  background: #fff;
+  color: var(--maroon);
+}
+
+.shortcutLive:hover {
+  background: var(--gold-soft);
+  color: var(--maroon);
+}
+
+/* ---------------- 2. Site map ---------------- */
+.map {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 24px;
+  padding: 30px 8px 26px;
+}
+
+.columnTitle {
+  margin: 0 0 10px;
+  color: var(--headline-color);
+  font-family: var(--font-display);
+  font-size: 0.98rem;
+  font-weight: 600;
+}
+
+.column ul {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mapLink {
+  position: relative;
+  color: var(--secondary-text-color);
+  font-size: 0.9rem;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.mapLink::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  width: 100%;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.25s var(--ease-out);
+}
+
+.mapLink:hover {
+  color: var(--primary-color);
+}
+
+.mapLink:hover::after {
+  transform: scaleX(1);
+}
+
+.mapLink:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+/* ---------------- 3. Bottom bar ---------------- */
+.bottom {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px 24px;
+  padding: 16px 8px 0;
+  border-top: 1px solid var(--border-color);
+  /* a thin gold accent in the middle of the divider */
+  background: linear-gradient(90deg, transparent, var(--gold), transparent) top center / 160px 1px no-repeat;
+  color: var(--secondary-text-color);
+  font-size: 0.85rem;
+}
+
+.copy,
+.fateh {
+  margin: 0;
+}
+
+.version {
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  background: rgba(var(--primary-rgb), 0.1);
+  color: var(--primary-color);
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.fateh {
+  color: var(--primary-color);
+  font-weight: 600;
+  text-align: center;
+}
+
+.session {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px 14px;
+}
+
+.signedIn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.signedIn svg {
+  flex-shrink: 0;
+  color: var(--primary-color);
+}
+
+.signedIn strong {
+  color: var(--text-color);
+}
+
+.top {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--input-border-color);
+  border-radius: var(--radius-pill);
+  background: var(--card-bg-color);
+  color: var(--primary-color);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.top:hover {
+  border-color: var(--primary-color);
+  background: rgba(var(--primary-rgb), 0.08);
+}
+
+.top:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+/* ---------------- Dark mode ---------------- */
+[data-theme='dark'] .band {
+  border-color: rgba(242, 179, 194, 0.16);
+  background: radial-gradient(120% 140% at 0% 0%, rgba(201, 162, 74, 0.18), transparent 55%),
+    linear-gradient(135deg, #4a0a1c 0%, #2c0611 55%, #1b040b 100%);
+}
+
+/* ---------------- Responsive ---------------- */
+@media (max-width: 1200px) {
+  .map {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .bottom {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+
+  .session {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 640px) {
+  .band {
+    padding: 22px 20px;
+    border-radius: var(--radius-lg);
+  }
+
+  .brand {
+    flex-basis: 100%;
+    align-items: flex-start;
+  }
+
+  .arch {
+    width: 52px;
+    height: 66px;
+  }
+
+  .arch span {
+    font-size: 1.5rem;
+  }
+
+  .wordmark {
+    font-size: 1.45rem;
+  }
+
+  .shortcuts {
+    width: 100%;
+  }
+
+  .shortcut {
+    flex: 1 1 calc(50% - 10px);
+    justify-content: center;
+  }
+
+  .map {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 22px 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shortcut,
+  .mapLink::after {
+    transition: none;
+  }
+}
